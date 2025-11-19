@@ -1,0 +1,59 @@
+.root {
+  @apply min-h-[calc(100vh-4rem)] p-6 grid place-items-start;
+}
+
+.inner {
+  @apply w-full max-w-3xl space-y-4;
+}
+
+.headerRow {
+  @apply flex items-center gap-2;
+}
+
+.backBtn {
+  @apply px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800;
+}
+
+.headerTitle {
+  @apply text-xl font-semibold;
+}
+
+.section {
+  @apply space-y-2;
+}
+
+.sectionLabel {
+  @apply text-xs uppercase text-slate-500 dark:text-slate-400;
+}
+
+.prefGrid {
+  @apply grid gap-2;
+}
+
+.prefCard {
+  @apply w-full flex items-center justify-between px-4 py-3 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900;
+}
+
+.prefLeft {
+  @apply flex items-center gap-3;
+}
+
+.prefIconBox {
+  @apply w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 grid place-items-center;
+}
+
+.prefLabel {
+  @apply text-sm;
+}
+
+.langSelect {
+  @apply text-xs rounded-lg border dark:border-slate-700 bg-white dark:bg-slate-900;
+}
+
+.logoutBtn {
+  @apply w-full px-4 py-3 rounded-xl bg-red-600 text-white;
+}
+
+.version {
+  @apply text-center text-xs text-slate-500 dark:text-slate-400;
+}

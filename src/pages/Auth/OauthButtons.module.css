@@ -1,0 +1,7 @@
+.root {
+  @apply space-y-2;
+}
+
+.btn {
+  @apply w-full px-4 py-2 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900;
+}

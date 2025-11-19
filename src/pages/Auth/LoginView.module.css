@@ -1,0 +1,23 @@
+.root {
+  @apply space-y-3;
+}
+
+.forgotRow {
+  @apply text-right text-sm;
+}
+
+.forgotBtn {
+  @apply text-blue-600;
+}
+
+.signInBtn {
+  @apply w-full px-4 py-2 rounded-xl bg-blue-600 text-white;
+}
+
+.bottomText {
+  @apply text-center text-sm;
+}
+
+.linkBtn {
+  @apply text-blue-600 ml-1;
+}

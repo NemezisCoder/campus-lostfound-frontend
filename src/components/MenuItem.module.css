@@ -1,0 +1,18 @@
+.item {
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 1rem; /* px-4 py-2 */
+  border: none;
+  background: transparent;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.item:hover {
+  background-color: #f8fafc; /* hover:bg-slate-50 */
+}
+
+:global(.dark) .item:hover {
+  background-color: #020617; /* dark:hover:bg-slate-800/950 */
+}

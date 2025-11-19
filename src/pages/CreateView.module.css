@@ -1,0 +1,72 @@
+.root {
+  @apply h-[calc(100vh-4rem)] grid grid-cols-2 gap-6 p-6;
+}
+
+.formCard,
+.previewCard {
+  @apply bg-white dark:bg-slate-900 border dark:border-slate-700 rounded-2xl p-4;
+}
+
+.title {
+  @apply text-lg font-semibold mb-3;
+}
+
+.formBody {
+  @apply space-y-3;
+}
+
+.typeRow {
+  @apply flex gap-2;
+}
+
+.typePrimary {
+  @apply px-3 py-2 rounded-xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900;
+}
+
+.typeSecondary {
+  @apply px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800;
+}
+
+.dropzone {
+  @apply rounded-xl border dark:border-slate-700 p-4 bg-slate-50 dark:bg-slate-800;
+}
+
+.input {
+  @apply w-full px-3 py-2 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900;
+}
+
+.textarea {
+  @apply w-full px-3 py-2 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900;
+}
+
+.metaGrid {
+  @apply grid grid-cols-3 gap-2;
+}
+
+.metaControl {
+  @apply px-3 py-2 rounded-xl border dark:border-slate-700 bg-white dark:bg-slate-900;
+}
+
+.submitBtn {
+  @apply px-4 py-2 rounded-xl bg-blue-600 text-white;
+}
+
+.previewImage {
+  @apply aspect-video rounded-xl bg-slate-100 dark:bg-slate-800 mb-3;
+}
+
+.previewGrid {
+  @apply grid grid-cols-3 gap-2;
+}
+
+.previewItem {
+  @apply rounded-lg border dark:border-slate-700 overflow-hidden;
+}
+
+.previewThumb {
+  @apply aspect-[4/3] bg-slate-100 dark:bg-slate-800;
+}
+
+.previewCaption {
+  @apply px-2 py-1 text-xs;
+}

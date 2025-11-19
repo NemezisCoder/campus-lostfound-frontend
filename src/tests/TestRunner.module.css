@@ -1,0 +1,37 @@
+.root {
+  position: fixed;
+  bottom: 4rem; /* bottom-16 */
+  right: 1rem;  /* right-4 */
+  z-index: 50;
+  width: 20rem; /* w-80 */
+  max-height: 60vh;
+  overflow: auto;
+  border-radius: 1rem; /* rounded-2xl */
+  border: 1px solid rgb(226 232 240); /* slate-200 */
+  background: white;
+  color: rgb(30 41 59); /* slate-800 */
+  box-shadow: 0px 4px 20px rgba(0,0,0,0.12);
+  padding: 0.75rem;
+}
+
+.title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.running {
+  font-size: 0.875rem;
+  color: rgb(100 116 139); /* slate-500 */
+}
+
+.list {
+  font-size: 0.875rem;
+}
+
+.ok {
+  color: rgb(5 150 105); /* emerald-600 */
+}
+
+.fail {
+  color: rgb(220 38 38); /* red-600 */
+}

@@ -1,0 +1,26 @@
+.button {
+  padding: 0.5rem 0.75rem; /* px-3 py-2 */
+  border-radius: 0.75rem;  /* rounded-lg */
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  background: transparent;
+}
+
+.button:hover {
+  background-color: #f1f5f9; /* hover:bg-slate-100 */
+}
+
+:global(.dark) .button:hover {
+  background-color: #020617; /* dark:hover:bg-slate-800/950 */
+}
+
+.active {
+  background-color: #020617; /* bg-slate-900 */
+  color: #ffffff;
+}
+
+:global(.dark) .active {
+  background-color: #f9fafb; /* dark:bg-slate-100 */
+  color: #020617;            /* dark:text-slate-900 */
+}

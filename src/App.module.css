@@ -1,0 +1,38 @@
+/* App.module.css */
+
+.app {
+  min-height: 100vh;       /* h-screen */
+  width: 100%;             /* w-full */
+  background-color: #f8fafc; /* bg-slate-50 */
+  color: #0f172a;          /* text-slate-800 */
+}
+
+/* Тёмная тема */
+.appDark {
+  background-color: #020617; /* dark:bg-slate-900 */
+  color: #f9fafb;            /* dark:text-slate-100 */
+}
+
+/* Кнопка открытия панели тестов */
+.testsButton {
+  position: fixed;
+  bottom: 1rem;  /* bottom-4 */
+  right: 1rem;   /* right-4 */
+  z-index: 50;
+  padding: 0.5rem 0.75rem; /* px-3 py-2 */
+  border-radius: 0.75rem;  /* rounded-xl */
+  background-color: #020617; /* bg-slate-900 */
+  color: #ffffff;          /* text-white */
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.4); /* shadow */
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.testsButton:focus-visible {
+  outline: 2px solid #e5e7eb;
+  outline-offset: 2px;
+}

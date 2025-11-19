@@ -1,0 +1,11 @@
+.root {
+  @apply flex items-center gap-3 my-2;
+}
+
+.line {
+  @apply h-px bg-slate-200 dark:bg-slate-700 flex-1;
+}
+
+.text {
+  @apply text-xs text-slate-500 dark:text-slate-400;
+}

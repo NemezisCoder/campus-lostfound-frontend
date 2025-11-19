@@ -1,0 +1,66 @@
+.root {
+  position: relative;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem; /* px-2 py-1 */
+  border-radius: 0.75rem;   /* rounded-xl */
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.button:hover {
+  background-color: #f1f5f9; /* slate-100 */
+}
+
+:global(.dark) .button:hover {
+  background-color: #020617; /* slate-950 ~ dark:bg-slate-800/900 */
+}
+
+.avatarCircle {
+  width: 2rem;   /* w-8 */
+  height: 2rem;  /* h-8 */
+  border-radius: 9999px;
+  background-image: linear-gradient(to top right, #6366f1, #3b82f6);
+}
+
+.name {
+  font-size: 0.875rem; /* text-sm */
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .name {
+    display: inline;
+  }
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  margin-top: 0.5rem; /* mt-2 */
+  width: 14rem;       /* w-56 */
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
+  overflow: hidden;
+}
+
+:global(.dark) .menu {
+  background-color: #020617; /* dark:bg-slate-900/950 */
+  border-color: #334155;     /* dark:border-slate-700 */
+}
+
+.divider {
+  height: 1px;
+  background-color: #e5e7eb; /* slate-200 */
+}
+
+:global(.dark) .divider {
+  background-color: #334155; /* dark:bg-slate-700 */
+}

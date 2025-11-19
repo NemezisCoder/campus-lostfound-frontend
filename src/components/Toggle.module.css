@@ -1,0 +1,37 @@
+.label {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.input {
+  display: none;
+}
+
+.track {
+  width: 2.5rem;  /* w-10 */
+  height: 1.5rem; /* h-6 */
+  border-radius: 9999px;
+  padding: 0.125rem; /* p-0.5 */
+  background-color: #cbd5f5; /* slate-300 */
+  transition: background-color 150ms ease-in-out;
+  display: flex;
+  align-items: center;
+}
+
+.trackChecked {
+  background-color: #10b981; /* bg-emerald-500 */
+}
+
+.thumb {
+  width: 1.25rem;  /* w-5 */
+  height: 1.25rem; /* h-5 */
+  border-radius: 9999px;
+  background-color: #ffffff;
+  transition: transform 150ms ease-in-out;
+}
+
+.thumbChecked {
+  transform: translateX(1rem); /* translate-x-4 */
+}
