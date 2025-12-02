@@ -12,6 +12,8 @@ import ProfileView from "./pages/ProfileView";
 import AccountSettingsView from "./pages/Account/AccountSettingsView";
 import ChangePasswordView from "./pages/Account/ChangePasswordView";
 import TestRunner from "./tests/TestRunner";
+import type { MapItem } from "./api/items";
+import { fetchItems } from "./api/items";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 
 import styles from "./App.module.css";
@@ -22,10 +24,20 @@ export default function App() {
   const [isAuthed, setIsAuthed] = useState(false);
   const [dark, setDark] = useState(false);
   const [showTests, setShowTests] = useState(false);
-
+  const [items, setItems] = useState<MapItem[]>([]);
   const navigate = useNavigate();
   const location = useLocation();
 
+  useEffect(() => {
+    fetchItems()
+      .then((data) => setItems(data))
+      .catch((e) => console.error("Failed to load items:", e));
+  }, []);
+
+  // Функция для добавления нового item
+  function addItem(newItem: MapItem) {
+    setItems((prev) => [newItem, ...prev]);
+  }
   // URL -> view
   useEffect(() => {
     switch (location.pathname) {
@@ -124,10 +136,11 @@ export default function App() {
             <MapView
               drawerOpen={drawerOpen}
               setDrawerOpen={setDrawerOpen}
+              items={items}
             />
           }
         />
-        <Route path="/create" element={<CreateView />} />
+        <Route path="/create" element={<CreateView onItemCreated={addItem} />} />
         <Route path="/chat" element={<ChatView />} />
         <Route path="/moderation" element={<ModerationView />} />
 
@@ -194,16 +207,6 @@ export default function App() {
           }
         />
 
-        {/* опциональный fallback */}
-        <Route
-          path="*"
-          element={
-            <MapView
-              drawerOpen={drawerOpen}
-              setDrawerOpen={setDrawerOpen}
-            />
-          }
-        />
       </Routes>
 
       <button

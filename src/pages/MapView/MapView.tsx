@@ -2,119 +2,8 @@ import { useState } from "react";
 import Filters from "./Filters";
 import ItemCard from "./ItemCard";
 import styles from "./MapView.module.css";
-import { MAIN_MAP_COORDS, RoomId } from "../../data/roomCoords";
-
-type ItemType = "lost" | "found";
-type StatusType = "OPEN" | "IN_PROGRESS" | "CLOSED";
-type CategoryType = "electronics" | "clothes" | "personal" | "documents";
-
-type MapItem = {
-  id: number;
-  title: string;
-  type: ItemType;
-  status: StatusType;
-  category: CategoryType;
-  roomId: RoomId;
-  roomLabel: string; // Аудитория
-  floorLabel: string; // Этаж
-  timeAgo: string;
-  description: string;
-};
-
-const ITEMS: MapItem[] = [
-  {
-    id: 1,
-    title: "Кошелёк чёрный",
-    type: "lost",
-    status: "OPEN",
-    category: "personal",
-    roomId: "A-165",
-    roomLabel: "А-165",
-    floorLabel: "1 этаж",
-    timeAgo: "2ч назад",
-    description:
-      "Потерян возле аудитории А-165. Внутри студенческий билет и банковская карта.",
-  },
-  {
-    id: 2,
-    title: "Наушники Apple AirPods Pro",
-    type: "found",
-    status: "IN_PROGRESS",
-    category: "electronics",
-    roomId: "A-120",
-    roomLabel: "А-120",
-    floorLabel: "1 этаж",
-    timeAgo: "30 мин назад",
-    description:
-      "Найдены белые AirPods Pro в коридоре рядом с аудиторией А-120. Кейc с небольшой царапиной.",
-  },
-  {
-    id: 3,
-    title: "Зонт серый",
-    type: "lost",
-    status: "CLOSED",
-    category: "personal",
-    roomId: "A-101",
-    roomLabel: "А-101",
-    floorLabel: "1 этаж",
-    timeAgo: "Сегодня утром",
-    description:
-      "Серый складной зонт, оставлен у входа в аудитории А-101. На ручке небольшая потертость.",
-  },
-  {
-    id: 4,
-    title: "Флешка SanDisk 32GB",
-    type: "lost",
-    status: "OPEN",
-    category: "electronics",
-    roomId: "A-170",
-    roomLabel: "А-170",
-    floorLabel: "1 этаж",
-    timeAgo: "1ч назад",
-    description:
-      "Потеряна флешка SanDisk 32GB возле аудитории А-170. Металлический корпус, на брелке небольшая царапина.",
-  },
-  {
-    id: 5,
-    title: "Толстовка синяя",
-    type: "found",
-    status: "IN_PROGRESS",
-    category: "clothes",
-    roomId: "A-101",
-    roomLabel: "А-101",
-    floorLabel: "1 этаж",
-    timeAgo: "10 мин назад",
-    description:
-      "Найдена синяя толстовка без надписей возле аудитории А-101. Оставлена на вешалке у входа.",
-  },
-  {
-    id: 6,
-    title: "Перчатки чёрные",
-    type: "lost",
-    status: "CLOSED",
-    category: "clothes",
-    roomId: "A-170",
-    roomLabel: "А-170",
-    floorLabel: "1 этаж",
-    timeAgo: "Вчера",
-    description:
-      "Потеряны чёрные тканевые перчатки рядом с аудиторией А-170. Владелец уже найден.",
-  },
-  {
-    id: 7,
-    title: "Смартфон Xiaomi",
-    type: "found",
-    status: "OPEN",
-    category: "electronics",
-    roomId: "A-165",
-    roomLabel: "А-165",
-    floorLabel: "1 этаж",
-    timeAgo: "5 мин назад",
-    description:
-      "Найден смартфон Xiaomi возле аудитории А-165. На чехле наклейка с котом.",
-  },
-];
-
+import { MAIN_MAP_COORDS } from "../../data/roomCoords";
+import type { MapItem, ItemType, CategoryType, StatusType } from "../../api/items";
 
 type TypeFilter = "all" | ItemType;
 type CategoryFilter = "all" | CategoryType;
@@ -123,12 +12,14 @@ type StatusFilter = "all" | StatusType;
 export default function MapView({
   drawerOpen,
   setDrawerOpen,
+  items,
 }: {
   drawerOpen: boolean;
   setDrawerOpen: (b: boolean) => void;
+  items: MapItem[];
 }) {
   const [selectedId, setSelectedId] = useState<number | null>(
-    ITEMS[0]?.id ?? null,
+    items[0]?.id ?? null,
   );
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
@@ -136,9 +27,8 @@ export default function MapView({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   // Отфильтрованные элементы для списка и карты
-  const filteredItems = ITEMS.filter((item) => {
-    const byType =
-      typeFilter === "all" ? true : item.type === typeFilter;
+  const filteredItems = items.filter((item) => {
+    const byType = typeFilter === "all" ? true : item.type === typeFilter;
     const byCategory =
       categoryFilter === "all" ? true : item.category === categoryFilter;
     const byStatus =
@@ -182,8 +72,8 @@ export default function MapView({
         {selectedItem && markerStyle && (
           <div
             className={`${styles.marker} ${selectedItem.type === "lost"
-              ? styles.markerLost
-              : styles.markerFound
+                ? styles.markerLost
+                : styles.markerFound
               }`}
             style={markerStyle}
           />

@@ -1,24 +1,121 @@
-import { useState, ChangeEvent } from "react";
+import { useState, ChangeEvent, FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import styles from "./CreateView.module.css";
 import { PREVIEW_MAP_COORDS, RoomId } from "../data/roomCoords";
+import type { MapItem } from "../api/items";
 type ItemType = "lost" | "found";
 type RoomValue = "" | RoomId;
+type CategoryType = "electronics" | "clothes" | "personal" | "documents";
 
+const ROOM_META: Record<
+  RoomId,
+  {
+    roomLabel: string;
+    floorLabel: string;
+  }
+> = {
+  "A-101": { roomLabel: "А-101", floorLabel: "1 этаж" },
+  "A-120": { roomLabel: "А-120", floorLabel: "1 этаж" },
+  "A-165": { roomLabel: "А-165", floorLabel: "1 этаж" },
+  "A-170": { roomLabel: "А-170", floorLabel: "1 этаж" },
+};
 
+const API_BASE = "http://localhost:8000/api/v1";
 
-export default function CreateView() {
+type Props = {
+  onItemCreated: (item: MapItem) => void;
+};
+
+export default function CreateView({ onItemCreated }: Props) {
   const [type, setType] = useState<ItemType>("lost");
   const [room, setRoom] = useState<RoomValue>("");
   const [imageName, setImageName] = useState<string | null>(null);
 
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<CategoryType | "">("");
+  const [datetime, setDatetime] = useState("");
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const navigate = useNavigate();
+
   const coords = room ? PREVIEW_MAP_COORDS[room] : undefined;
-
-
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     setImageName(file ? file.name : null);
   };
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+
+    if (!title.trim()) {
+      setError("Введите название");
+      return;
+    }
+    if (!category) {
+      setError("Выберите категорию");
+      return;
+    }
+    if (!room) {
+      setError("Выберите аудиторию");
+      return;
+    }
+
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const meta = ROOM_META[room];
+
+      // Формируем payload, как ждёт backend
+      const payload = {
+        title,
+        type,
+        status: "OPEN" as const,
+        category: category as CategoryType,
+        roomId: room,
+        roomLabel: meta.roomLabel,
+        floorLabel: meta.floorLabel,
+        timeAgo: "только что", // можно потом заменить на реальное время
+        description,
+      };
+
+      const res = await fetch(`${API_BASE}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to create item");
+      }
+
+      const created: MapItem = await res.json();
+
+      // Добавляем новый item в список в App.tsx
+      onItemCreated(created);
+
+      // Сброс формы
+      setTitle("");
+      setDescription("");
+      setCategory("");
+      setRoom("");
+      setDatetime("");
+      setImageName(null);
+      setType("lost");
+
+      // Переходим на карту
+      navigate("/");
+    } catch (err) {
+      console.error(err);
+      setError("Не удалось опубликовать пост");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <div className={styles.root}>
@@ -26,7 +123,7 @@ export default function CreateView() {
       <div className={styles.formCard}>
         <div className={styles.title}>Создать пост</div>
 
-        <div className={styles.formBody}>
+        <form className={styles.formBody} onSubmit={handleSubmit}>
           {/* Потерял / Нашёл */}
           <div className={styles.typeRow}>
             <button
@@ -60,32 +157,51 @@ export default function CreateView() {
               accept="image/*"
               onChange={handleFileChange}
               className={styles.fileInputHidden}
-              style={{ display: "none" }} // на всякий случай прячем инлайном
+              style={{ display: "none" }}
             />
           </label>
 
           {/* Название / описание */}
-          <input className={styles.input} placeholder="Название" />
+          <input
+            className={styles.input}
+            placeholder="Название"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
           <textarea
             className={styles.textarea}
             rows={4}
             placeholder="Описание"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
           />
 
           {/* Категория, дата/время, место */}
           <div className={styles.metaGrid}>
             {/* Категория */}
-            <select className={styles.metaControl} defaultValue="">
+            <select
+              className={styles.metaControl}
+              value={category}
+              onChange={(e) =>
+                setCategory(e.target.value as CategoryType | "")
+              }
+            >
               <option value="" disabled>
                 Категория
               </option>
               <option value="electronics">Электроника</option>
               <option value="clothes">Одежда</option>
               <option value="personal">Личные вещи</option>
+              <option value="documents">Документы</option>
             </select>
 
-            {/* Дата / время */}
-            <input className={styles.metaControl} placeholder="Дата/время" />
+            {/* Дата / время (пока просто текст, для бэка не используем) */}
+            <input
+              className={styles.metaControl}
+              placeholder="Дата/время"
+              value={datetime}
+              onChange={(e) => setDatetime(e.target.value)}
+            />
 
             {/* Место (аудитория) */}
             <select
@@ -101,9 +217,16 @@ export default function CreateView() {
             </select>
           </div>
 
+          {error && <div className={styles.error}>{error}</div>}
 
-          <button className={styles.submitBtn}>Опубликовать</button>
-        </div>
+          <button
+            type="submit"
+            className={styles.submitBtn}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Публикуем..." : "Опубликовать"}
+          </button>
+        </form>
       </div>
 
       {/* Правая колонка — карта + похожие */}
@@ -121,7 +244,7 @@ export default function CreateView() {
               src="https://mtuci-map.vercel.app/"
               className={styles.previewMapFrame}
               loading="lazy"
-              style={{ pointerEvents: "none" }} // карта статичная, двигать нельзя
+              style={{ pointerEvents: "none" }}
             />
             <div className={styles.previewCityBadge}>
               📍 Кампус МТУСИ • 1 этаж
