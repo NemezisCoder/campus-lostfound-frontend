@@ -13,3 +13,9 @@
 .linkBtn {
   @apply text-blue-600 ml-1;
 }
+
+.nameRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}

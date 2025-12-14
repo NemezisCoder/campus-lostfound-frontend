@@ -17,7 +17,11 @@ export default function SignUpView({
       subtitle="Join Campus Lost&Found community"
     >
       <div className={styles.root}>
-        <Input placeholder="Full Name" />
+        <div className={styles.nameRow}>
+          <Input placeholder="Name" />
+          <Input placeholder="Surname" />
+        </div>
+
         <Input placeholder="Email" type="email" />
         <Input placeholder="Password" type="password" />
 
