@@ -27,3 +27,7 @@
 .meta {
   @apply text-xs text-slate-500 dark:text-slate-400 mt-1;
 }
+
+.image {
+  @apply aspect-[16/9] bg-slate-100 dark:bg-slate-800;
+}

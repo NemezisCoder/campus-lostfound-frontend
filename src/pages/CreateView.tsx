@@ -1,8 +1,11 @@
-import { useState, ChangeEvent, FormEvent } from "react";
+import { useEffect, useMemo, useState, ChangeEvent, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./CreateView.module.css";
 import { PREVIEW_MAP_COORDS, RoomId } from "../data/roomCoords";
-import type { MapItem } from "../api/items";
+import type { MapItem, ItemCreatePayload, SimilarMatch } from "../api/items";
+import { createItem, uploadItemImage, searchSimilarByImage } from "../api/items";
+import { resolveMediaUrl } from "../api/media";
+
 type ItemType = "lost" | "found";
 type RoomValue = "" | RoomId;
 type CategoryType = "electronics" | "clothes" | "personal" | "documents";
@@ -20,16 +23,23 @@ const ROOM_META: Record<
   "A-170": { roomLabel: "А-170", floorLabel: "1 этаж" },
 };
 
-const API_BASE = "http://localhost:8000/api/v1";
-
 type Props = {
   onItemCreated: (item: MapItem) => void;
 };
 
 export default function CreateView({ onItemCreated }: Props) {
-  const [type, setType] = useState<ItemType>("lost");
+  const navigate = useNavigate();
+
+  // No default selection: user must choose lost/found explicitly.
+  const [type, setType] = useState<ItemType | null>(null);
+
   const [room, setRoom] = useState<RoomValue>("");
   const [imageName, setImageName] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+
+  const [similar, setSimilar] = useState<SimilarMatch[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -38,130 +48,255 @@ export default function CreateView({ onItemCreated }: Props) {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const navigate = useNavigate();
+  // Confirmation modal state (no window.confirm).
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState<string | null>(null);
+  const [pendingPublish, setPendingPublish] = useState<(() => Promise<void>) | null>(
+    null,
+  );
 
-  const coords = room ? PREVIEW_MAP_COORDS[room] : undefined;
+  const coords = useMemo(() => {
+    return room ? PREVIEW_MAP_COORDS[room] : undefined;
+  }, [room]);
+
+  // ✅ take top-3 by similarity (desc)
+  const topSimilar = useMemo(() => {
+    return [...similar].sort((a, b) => b.similarity - a.similarity).slice(0, 3);
+  }, [similar]);
+
+  // Helper: returns opposite type for matching.
+  const getTargetType = (t: ItemType) => (t === "lost" ? "found" : "lost");
+
+  // Helper: open modal and store continuation.
+  function openConfirm(message: string, onConfirm: () => Promise<void>) {
+    setConfirmText(message);
+    setPendingPublish(() => onConfirm);
+    setConfirmOpen(true);
+  }
+
+  // Helper: close modal and drop continuation.
+  function closeConfirm() {
+    setConfirmOpen(false);
+    setConfirmText(null);
+    setPendingPublish(null);
+  }
+
+  // UX: allow closing modal with Escape.
+  useEffect(() => {
+    if (!confirmOpen) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeConfirm();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [confirmOpen]);
+
+  // Helper: run similarity search only when we have BOTH file + type.
+  async function runSimilarSearch(selectedType: ItemType, file: File) {
+    setIsSearching(true);
+    setHasSearched(true);
+    setError(null);
+
+    try {
+      const raw = await searchSimilarByImage(file, 8);
+
+      // Show only opposite type matches (lost -> found, found -> lost).
+      const targetType = getTargetType(selectedType);
+      const filtered = raw.filter((m) => m.item.type === targetType);
+
+      setSimilar(filtered);
+      return filtered;
+    } catch (err: any) {
+      // If backend requires auth, we surface a friendly message.
+      const status = err?.response?.status;
+      if (status === 401) {
+        setError("Войдите в аккаунт, чтобы видеть похожие объявления.");
+      }
+      setSimilar([]);
+      return [];
+    } finally {
+      setIsSearching(false);
+    }
+  }
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const file = event.target.files?.[0] ?? null;
+
     setImageName(file ? file.name : null);
+    setImageFile(file);
+
+    // Do NOT auto-search on file selection.
+    // Search should happen only after user selects lost/found.
+    setSimilar([]);
+    setHasSearched(false);
+    setSuccess(null);
+    setError(null);
   };
+
+  const handleTypeClick = async (nextType: ItemType) => {
+    setType(nextType);
+    setSuccess(null);
+    setError(null);
+
+    // If user already picked a file, run search now.
+    if (imageFile) {
+      await runSimilarSearch(nextType, imageFile);
+    } else {
+      // No file -> no results.
+      setSimilar([]);
+      setHasSearched(false);
+    }
+  };
+
+  // Anti-duplicate rule (MVP):
+  // If there is a very similar ACTIVE item (status != CLOSED), ask user via modal.
+  const DUPLICATE_THRESHOLD = 0.9;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setSuccess(null);
 
-    if (!title.trim()) {
-      setError("Введите название");
-      return;
-    }
-    if (!category) {
-      setError("Выберите категорию");
-      return;
-    }
-    if (!room) {
-      setError("Выберите аудиторию");
-      return;
-    }
+    if (!type) return setError("Выберите: Потерял или Нашёл");
+    if (!title.trim()) return setError("Введите название");
+    if (!category) return setError("Выберите категорию");
+    if (!room) return setError("Выберите аудиторию");
 
     setError(null);
     setIsSubmitting(true);
 
-    try {
-      const meta = ROOM_META[room];
+    const doPublish = async () => {
+      const meta = ROOM_META[room as RoomId];
 
-      // Формируем payload, как ждёт backend
-      const payload = {
+      const payload: ItemCreatePayload = {
         title,
         type,
-        status: "OPEN" as const,
+        status: "OPEN",
         category: category as CategoryType,
-        roomId: room,
+        roomId: room as RoomId,
         roomLabel: meta.roomLabel,
         floorLabel: meta.floorLabel,
-        timeAgo: "только что", // можно потом заменить на реальное время
+        timeAgo: "только что",
         description,
       };
 
-      const res = await fetch(`${API_BASE}/items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const created = await createItem(payload);
+      const finalItem = imageFile ? await uploadItemImage(created.id, imageFile) : created;
 
-      if (!res.ok) {
-        throw new Error("Failed to create item");
-      }
+      onItemCreated(finalItem);
 
-      const created: MapItem = await res.json();
+      setSuccess("Пост опубликован ✅");
 
-      // Добавляем новый item в список в App.tsx
-      onItemCreated(created);
-
-      // Сброс формы
+      // Reset form.
       setTitle("");
       setDescription("");
       setCategory("");
       setRoom("");
       setDatetime("");
       setImageName(null);
-      setType("lost");
+      setImageFile(null);
+      setSimilar([]);
+      setHasSearched(false);
+      setType(null);
+    };
 
-      // Переходим на карту
-      navigate("/");
-    } catch (err) {
+    try {
+      // If we have an image, check duplicates BEFORE publishing.
+      if (imageFile) {
+        const matches = hasSearched ? similar : await runSimilarSearch(type, imageFile);
+
+        const strongDuplicate = matches.find(
+          (m) =>
+            m.similarity >= DUPLICATE_THRESHOLD &&
+            // Treat missing status as active (safety).
+            (m.item.status ?? "OPEN") !== "CLOSED",
+        );
+
+        if (strongDuplicate) {
+          // Stop submit spinner and ask user via modal.
+          setIsSubmitting(false);
+
+          openConfirm(
+            `Найдено очень похожее объявление (${Math.round(
+              strongDuplicate.similarity * 100,
+            )}%).\n\nРекомендуем открыть похожее объявление и написать владельцу в чат.\n\nОпубликовать всё равно?`,
+            async () => {
+              setIsSubmitting(true);
+              try {
+                await doPublish();
+                closeConfirm();
+              } catch (err: any) {
+                console.error(err);
+                const msg =
+                  err?.response?.data?.detail ||
+                  err?.message ||
+                  "Не удалось опубликовать пост";
+                setError(String(msg));
+              } finally {
+                setIsSubmitting(false);
+              }
+            },
+          );
+
+          return;
+        }
+      }
+
+      // No strong duplicates -> publish immediately.
+      await doPublish();
+    } catch (err: any) {
       console.error(err);
-      setError("Не удалось опубликовать пост");
+      const msg =
+        err?.response?.data?.detail || err?.message || "Не удалось опубликовать пост";
+      setError(String(msg));
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  const previewTitle =
+    type === "lost" ? "Я потерял" : type === "found" ? "Я нашёл" : "Выберите тип";
+
   return (
     <div className={styles.root}>
-      {/* Левая колонка — форма */}
+      {/* Left column — form */}
       <div className={styles.formCard}>
         <div className={styles.title}>Создать пост</div>
 
         <form className={styles.formBody} onSubmit={handleSubmit}>
-          {/* Потерял / Нашёл */}
+          {/* Lost / Found selection */}
           <div className={styles.typeRow}>
             <button
               type="button"
-              className={
-                type === "lost" ? styles.typePrimary : styles.typeSecondary
-              }
-              onClick={() => setType("lost")}
+              className={type === "lost" ? styles.typePrimary : styles.typeSecondary}
+              onClick={() => void handleTypeClick("lost")}
             >
               Потерял
             </button>
             <button
               type="button"
-              className={
-                type === "found" ? styles.typePrimary : styles.typeSecondary
-              }
-              onClick={() => setType("found")}
+              className={type === "found" ? styles.typePrimary : styles.typeSecondary}
+              onClick={() => void handleTypeClick("found")}
             >
               Нашёл
             </button>
           </div>
 
-          {/* Загрузка фото */}
+          {/* Image upload */}
           <label className={styles.dropzone}>
-            <span>
-              {imageName ??
-                "Перетащи фото сюда или нажми, чтобы выбрать файл"}
-            </span>
+            <span>{imageName ?? "Перетащи фото сюда или нажми, чтобы выбрать файл"}</span>
             <input
               type="file"
               accept="image/*"
               onChange={handleFileChange}
               className={styles.fileInputHidden}
-              style={{ display: "none" }}
             />
           </label>
 
-          {/* Название / описание */}
+          {/* Title / description */}
           <input
             className={styles.input}
             placeholder="Название"
@@ -176,15 +311,12 @@ export default function CreateView({ onItemCreated }: Props) {
             onChange={(e) => setDescription(e.target.value)}
           />
 
-          {/* Категория, дата/время, место */}
+          {/* Category, datetime, room */}
           <div className={styles.metaGrid}>
-            {/* Категория */}
             <select
               className={styles.metaControl}
               value={category}
-              onChange={(e) =>
-                setCategory(e.target.value as CategoryType | "")
-              }
+              onChange={(e) => setCategory(e.target.value as CategoryType | "")}
             >
               <option value="" disabled>
                 Категория
@@ -195,7 +327,6 @@ export default function CreateView({ onItemCreated }: Props) {
               <option value="documents">Документы</option>
             </select>
 
-            {/* Дата / время (пока просто текст, для бэка не используем) */}
             <input
               className={styles.metaControl}
               placeholder="Дата/время"
@@ -203,7 +334,6 @@ export default function CreateView({ onItemCreated }: Props) {
               onChange={(e) => setDatetime(e.target.value)}
             />
 
-            {/* Место (аудитория) */}
             <select
               className={styles.metaControl}
               value={room}
@@ -218,25 +348,18 @@ export default function CreateView({ onItemCreated }: Props) {
           </div>
 
           {error && <div className={styles.error}>{error}</div>}
+          {success && <div className={styles.success}>{success}</div>}
 
-          <button
-            type="submit"
-            className={styles.submitBtn}
-            disabled={isSubmitting}
-          >
+          <button type="submit" className={styles.submitBtn} disabled={isSubmitting}>
             {isSubmitting ? "Публикуем..." : "Опубликовать"}
           </button>
         </form>
       </div>
 
-      {/* Правая колонка — карта + похожие */}
+      {/* Right column — map + similar */}
       <div className={styles.previewCard}>
-        <div className={styles.title}>
-          {type === "lost" ? "Я потерял" : "Я нашёл"} • Предпросмотр + Похожие
-          (ИИ)
-        </div>
+        <div className={styles.title}>{previewTitle} • Предпросмотр + Похожие (ИИ)</div>
 
-        {/* Большое окно с картой кампуса МТУСИ */}
         <div className={styles.previewImage}>
           <div className={styles.previewMapWrapper}>
             <iframe
@@ -246,16 +369,11 @@ export default function CreateView({ onItemCreated }: Props) {
               loading="lazy"
               style={{ pointerEvents: "none" }}
             />
-            <div className={styles.previewCityBadge}>
-              📍 Кампус МТУСИ • 1 этаж
-            </div>
+            <div className={styles.previewCityBadge}>📍 Кампус МТУСИ • 1 этаж</div>
 
-            {/* Маркер на карте */}
             {coords && (
               <div
-                className={`${styles.previewMarker} ${type === "lost"
-                  ? styles.previewMarkerLost
-                  : styles.previewMarkerFound
+                className={`${styles.previewMarker} ${type === "found" ? styles.previewMarkerFound : styles.previewMarkerLost
                   }`}
                 style={{ left: `${coords.x}%`, top: `${coords.y}%` }}
               />
@@ -263,16 +381,125 @@ export default function CreateView({ onItemCreated }: Props) {
           </div>
         </div>
 
-        {/* Похожие (заглушки) */}
         <div className={styles.previewGrid}>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className={styles.previewItem}>
-              <div className={styles.previewThumb} />
-              <div className={styles.previewCaption}>Похожий {i + 1}</div>
+          {!imageFile ? (
+            <div className={styles.previewCaption}>
+              Выберите фото, чтобы искать похожие объявления.
             </div>
-          ))}
+          ) : !type ? (
+            <div className={styles.previewCaption}>
+              Теперь выберите: Потерял или Нашёл — и мы покажем похожие (противоположного
+              типа).
+            </div>
+          ) : isSearching ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className={styles.previewItem}>
+                <div className={styles.previewThumb} />
+                <div className={styles.previewCaption}>Поиск...</div>
+              </div>
+            ))
+          ) : hasSearched && topSimilar.length === 0 ? (
+            <div className={styles.previewCaption}>
+              Похожих объявлений не найдено. Можно публиковать.
+            </div>
+          ) : (
+            topSimilar.map((m) => {
+              const img = resolveMediaUrl(m.item.image_url);
+
+              return (
+                <div
+                  key={m.item.id}
+                  className={styles.previewItem}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
+                    navigate("/chat", {
+                      state: {
+                        itemId: m.item.id,
+                        ownerId: m.item.owner_id,
+                        similarity: m.similarity,
+                      },
+                    })
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      navigate("/chat", {
+                        state: {
+                          itemId: m.item.id,
+                          ownerId: m.item.owner_id,
+                          similarity: m.similarity,
+                        },
+                      });
+                    }
+                  }}
+                >
+                  <div className={styles.previewThumb}>
+                    {img ? (
+                      <img
+                        src={img}
+                        alt={m.item.title}
+                        loading="lazy"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          display: "block",
+                        }}
+                      />
+                    ) : null}
+                  </div>
+
+                  <div className={styles.previewCaption}>
+                    {m.item.title} • {Math.round(m.similarity * 100)}%
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
+
+      {/* Confirmation modal */}
+      {confirmOpen && (
+        <div
+          className={styles.modalOverlay}
+          role="dialog"
+          aria-modal="true"
+          onClick={closeConfirm}
+        >
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalTitle}>Подтверждение</div>
+
+            <div className={styles.modalText}>
+              {(confirmText ?? "").split("\n").map((line, i) => (
+                <div key={i}>{line}</div>
+              ))}
+            </div>
+
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.modalSecondary}
+                onClick={closeConfirm}
+                disabled={isSubmitting}
+              >
+                Отмена
+              </button>
+
+              <button
+                type="button"
+                className={styles.modalPrimary}
+                onClick={() => {
+                  void pendingPublish?.();
+                }}
+                disabled={!pendingPublish || isSubmitting}
+              >
+                Опубликовать всё равно
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

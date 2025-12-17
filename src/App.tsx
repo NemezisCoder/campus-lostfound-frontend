@@ -16,6 +16,7 @@ import type { MapItem } from "./api/items";
 import { fetchItems } from "./api/items";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 
+import { api, setAccessToken } from "./api/client"; // ✅ добавили
 import styles from "./App.module.css";
 
 export default function App() {
@@ -28,16 +29,31 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // ✅ 1) На старте пытаемся восстановить сессию через refresh-cookie
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await api.post("/auth/refresh");
+        setAccessToken(r.data.access_token);
+        setIsAuthed(true);
+      } catch {
+        setAccessToken(null);
+        setIsAuthed(false);
+      }
+    })();
+  }, []);
+
+  // ✅ 2) Items грузим через axios (у тебя fetchItems уже axios)
   useEffect(() => {
     fetchItems()
       .then((data) => setItems(data))
       .catch((e) => console.error("Failed to load items:", e));
   }, []);
 
-  // Функция для добавления нового item
   function addItem(newItem: MapItem) {
     setItems((prev) => [newItem, ...prev]);
   }
+
   // URL -> view
   useEffect(() => {
     switch (location.pathname) {
@@ -76,7 +92,6 @@ export default function App() {
     }
   }, [location.pathname]);
 
-  // view -> URL (эта функция идёт в Header и TestRunner)
   const handleSetView = (v: View) => {
     setView(v);
     switch (v) {
@@ -114,13 +129,7 @@ export default function App() {
   };
 
   return (
-    <div
-      className={
-        dark
-          ? `${styles.app} ${styles.appDark}`
-          : styles.app
-      }
-    >
+    <div className={dark ? `${styles.app} ${styles.appDark}` : styles.app}>
       <Header
         view={view}
         setView={handleSetView}
@@ -129,22 +138,16 @@ export default function App() {
       />
 
       <Routes>
-        {/* публичные страницы */}
         <Route
           path="/"
           element={
-            <MapView
-              drawerOpen={drawerOpen}
-              setDrawerOpen={setDrawerOpen}
-              items={items}
-            />
+            <MapView drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} items={items} />
           }
         />
         <Route path="/create" element={<CreateView onItemCreated={addItem} />} />
         <Route path="/chat" element={<ChatView />} />
         <Route path="/moderation" element={<ModerationView />} />
 
-        {/* авторизация */}
         <Route
           path="/login"
           element={
@@ -170,19 +173,11 @@ export default function App() {
             />
           }
         />
-        <Route
-          path="/forgot"
-          element={<ForgotView onBack={() => handleSetView("login")} />}
-        />
+        <Route path="/forgot" element={<ForgotView onBack={() => handleSetView("login")} />} />
 
-        {/* профиль и настройки */}
         <Route
           path="/profile"
-          element={
-            <ProfileView
-              onOpenSettings={() => handleSetView("account")}
-            />
-          }
+          element={<ProfileView onOpenSettings={() => handleSetView("account")} />}
         />
         <Route
           path="/account"
@@ -190,9 +185,7 @@ export default function App() {
             <AccountSettingsView
               dark={dark}
               setDark={setDark}
-              onOpenChangePassword={() =>
-                handleSetView("change_password")
-              }
+              onOpenChangePassword={() => handleSetView("change_password")}
               onBack={() => handleSetView("profile")}
               onOpenAuth={() => handleSetView("login")}
             />
@@ -200,22 +193,11 @@ export default function App() {
         />
         <Route
           path="/account/password"
-          element={
-            <ChangePasswordView
-              onBack={() => handleSetView("account")}
-            />
-          }
+          element={<ChangePasswordView onBack={() => handleSetView("account")} />}
         />
-
       </Routes>
 
-      <button
-        aria-label="Open test panel"
-        onClick={() => setShowTests((v) => !v)}
-        className={styles.testsButton}
-      >
-        🧪 Tests
-      </button>
+
 
       {showTests && <TestRunner setView={handleSetView} />}
     </div>

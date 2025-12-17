@@ -1,10 +1,12 @@
 import styles from "./ItemCard.module.css";
+import { resolveMediaUrl } from "../../api/media";
 
 export interface ItemCardProps {
   title: string;
   place: string;
   timeAgo: string;
   status?: string;
+  imageUrl?: string | null;
   onClick?: () => void;
   onDoubleClick?: () => void;
 }
@@ -14,12 +16,27 @@ export default function ItemCard({
   place,
   timeAgo,
   status = "OPEN",
+  imageUrl,
   onClick,
   onDoubleClick,
 }: ItemCardProps) {
+  const img = resolveMediaUrl(imageUrl);
+
   return (
     <div className={styles.card} onClick={onClick} onDoubleClick={onDoubleClick}>
-      <div className={styles.image} />
+      <div
+        className={styles.image}
+        style={
+          img
+            ? {
+              backgroundImage: `url(${img})`,
+              backgroundSize: "contain",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "center",
+            }
+            : undefined
+        }
+      />
       <div className={styles.body}>
         <div className={styles.header}>
           <div className={styles.title}>{title}</div>

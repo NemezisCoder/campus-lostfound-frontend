@@ -1,17 +1,15 @@
+import React from "react";
 import styles from "./Input.module.css";
 
-export default function Input({
-  placeholder,
-  type = "text",
-}: {
+type Props = React.InputHTMLAttributes<HTMLInputElement> & {
   placeholder: string;
-  type?: string;
-}) {
+};
+
+export default function Input({ className, ...props }: Props) {
   return (
     <input
-      type={type}
-      className={styles.input}
-      placeholder={placeholder}
+      {...props}
+      className={[styles.input, className].filter(Boolean).join(" ")}
     />
   );
 }
