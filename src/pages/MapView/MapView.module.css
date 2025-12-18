@@ -165,3 +165,41 @@
 .modalPrimary {
   @apply px-3 py-2 rounded-xl bg-slate-900 text-white;
 }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Тип */
+.typeLost {
+  background: #2f6fed; /* синий */
+  color: #fff;
+}
+
+.typeFound {
+  background: #7c3aed; /* фиолетовый */
+  color: #fff;
+}
+
+/* Статус */
+.statusOpen {
+  background: #22c55e; /* зелёный */
+  color: #fff;
+}
+
+.statusInProgress {
+  background: #f59e0b; /* жёлтый */
+  color: #111;
+}
+
+.statusClosed {
+  background: #ef4444; /* красный */
+  color: #fff;
+}

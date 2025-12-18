@@ -3,10 +3,12 @@ import MenuItem from "./MenuItem";
 import styles from "./AvatarMenu.module.css";
 
 export default function AvatarMenu({
+  userLabel,
   onProfile,
   onSettings,
   onLogout,
 }: {
+  userLabel: string;
   onProfile: () => void;
   onSettings: () => void;
   onLogout: () => void;
@@ -15,33 +17,13 @@ export default function AvatarMenu({
 
   return (
     <div className={styles.root}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className={styles.button}
-      >
+      <button onClick={() => setOpen((o) => !o)} className={styles.button}>
         <div className={styles.avatarCircle} />
-        <span className={styles.name}>Анна</span>
+        <span className={styles.name}>{userLabel}</span>
       </button>
 
       {open && (
         <div className={styles.menu}>
-          <MenuItem
-            onClick={() => {
-              setOpen(false);
-              onProfile();
-            }}
-          >
-            Профиль
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setOpen(false);
-              onSettings();
-            }}
-          >
-            Настройки
-          </MenuItem>
-          <div className={styles.divider} />
           <MenuItem
             onClick={() => {
               setOpen(false);
@@ -53,6 +35,7 @@ export default function AvatarMenu({
           </MenuItem>
         </div>
       )}
+
     </div>
   );
 }

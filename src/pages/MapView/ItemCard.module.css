@@ -1,5 +1,3 @@
-
-
 .card {
   @apply rounded-2xl border dark:border-slate-700 hover:shadow-sm transition bg-white dark:bg-slate-900 overflow-hidden;
 }
@@ -13,21 +11,36 @@
 }
 
 .header {
-  @apply flex items-center justify-between;
+  @apply flex items-center justify-between gap-2;
 }
 
 .title {
-  @apply font-medium;
+  @apply font-medium truncate;
 }
 
-.status {
-  @apply px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200;
+/* базовый стиль чипа статуса */
+.statusChip {
+  @apply px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap;
+}
+
+/* статусы */
+.statusOpen {
+  @apply bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200;
+}
+
+.statusInProgress {
+  @apply bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200;
+}
+
+.statusClosed {
+  @apply bg-rose-50 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200;
 }
 
 .meta {
   @apply text-xs text-slate-500 dark:text-slate-400 mt-1;
 }
 
-.image {
-  @apply aspect-[16/9] bg-slate-100 dark:bg-slate-800;
+/* оставил для совместимости, если где-то ещё используется старый класс */
+.status {
+  @apply px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200;
 }

@@ -145,10 +145,23 @@ export default function MapView({
 
   const canChatSelected = useMemo(() => {
     if (!selectedItem) return false;
-    if (meId == null) return false; // пока meId не загрузился — клика нет
-    return selectedItem.owner_id !== meId;
+    if (meId == null) return false;
+    if (selectedItem.owner_id === meId) return false;
+    return selectedItem.status === "OPEN";
   }, [selectedItem, meId]);
+  const statusChipClass = useMemo(() => {
+    const s = selectedItem?.status ?? "OPEN";
+    if (s === "OPEN") return styles.statusOpen;
+    if (s === "IN_PROGRESS") return styles.statusInProgress;
+    if (s === "CLOSED") return styles.statusClosed;
+    return styles.statusOpen;
+  }, [selectedItem?.status]);
 
+  const typeChipClass = useMemo(() => {
+    return selectedItem?.type === "found" ? styles.typeFound : styles.typeLost;
+  }, [selectedItem?.type]);
+
+  // кандидаты похожих
   // кандидаты похожих
   useEffect(() => {
     if (!drawerOpen || !selectedItem) {
@@ -157,13 +170,22 @@ export default function MapView({
     }
 
     let cancelled = false;
+
+    // ✅ 1) сразу убираем старые "похожие", чтобы не мигало/не показывало чужие
+    setSimilarCandidates([]);
     setSimilarLoading(true);
+
+    console.log("selectedItem", selectedItem.id, selectedItem.image_url);
 
     deduplicateItem(selectedItem.id, 20, 0.0)
       .then((matches) => {
+        // ✅ 2) лог, сколько пришло и что именно
+        console.log("deduplicate matches:", matches.length, matches);
+
         if (!cancelled) setSimilarCandidates(matches);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.log("deduplicate error:", err);
         if (!cancelled) setSimilarCandidates([]);
       })
       .finally(() => {
@@ -179,17 +201,20 @@ export default function MapView({
 
   const top4Similar = useMemo(() => {
     if (!selectedItem) return [];
+
     const targetType: ItemType = selectedItem.type === "lost" ? "found" : "lost";
 
-    return [...similarCandidates]
+    const base = [...similarCandidates]
       .filter((m) => m.item?.id !== selectedItem.id)
       .filter((m) => m.item?.type === targetType)
-      .filter((m) => m.similarity >= SIMILARITY_THRESHOLD)
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, 4);
+      .filter((m) => m.item?.status !== "CLOSED") // скрываем CLOSED
+      .sort((a, b) => b.similarity - a.similarity);
+
+    const strong = base.filter((m) => m.similarity >= SIMILARITY_THRESHOLD);
+
+    // ✅ если сильных совпадений нет — показываем просто top-4 лучших
+    return (strong.length ? strong : base).slice(0, 4);
   }, [similarCandidates, selectedItem]);
-
-
 
   const askChatForSimilar = async (m: SimilarMatch) => {
     const id = await ensureMeId();
@@ -198,7 +223,7 @@ export default function MapView({
     if (m.item.owner_id === id) return;
 
     openConfirm("Уверены, что хотите перейти в чат?", () => {
-      navigate("/chat", {
+      navigate(`/chat?itemId=${m.item.id}&ownerId=${m.item.owner_id}`, {
         state: {
           itemId: m.item.id,
           ownerId: m.item.owner_id,
@@ -207,6 +232,7 @@ export default function MapView({
       });
     });
   };
+
   const askChatForItem = (item: MapItem) => {
     // пока не знаем себя — ничего
     if (meId == null) return;
@@ -215,7 +241,7 @@ export default function MapView({
     if (item.owner_id === meId) return;
 
     openConfirm("Уверены, что хотите перейти в чат?", () => {
-      navigate("/chat", {
+      navigate(`/chat?itemId=${item.id}&ownerId=${item.owner_id}`, {
         state: {
           itemId: item.id,
           ownerId: item.owner_id,
@@ -290,11 +316,15 @@ export default function MapView({
             />
 
             <div className={styles.chipsRow}>
-              <span className={styles.chipLoss}>
+              <span className={`${styles.chip} ${typeChipClass}`}>
                 {selectedItem.type === "lost" ? "Потеря" : "Нашёл"}
               </span>
-              <span className={styles.chipOpen}>{selectedItem.status}</span>
-              <span className={styles.chipPlace}>
+
+              <span className={`${styles.chip} ${statusChipClass}`}>
+                {selectedItem.status}
+              </span>
+
+              <span className={`${styles.chip} ${styles.chipPlace}`}>
                 {selectedItem.roomLabel}, {selectedItem.floorLabel}
               </span>
             </div>
@@ -318,13 +348,15 @@ export default function MapView({
                 <div className={styles.similarGrid}>
                   {top4Similar.map((m) => {
                     const img = resolveMediaUrl(m.item.image_url);
-
+                    const canOpen = m.item.status === "OPEN";
                     return (
                       <button
                         key={m.item.id}
                         type="button"
                         className={styles.similarCardBtn}
-                        onClick={() => askChatForSimilar(m)}
+                        onClick={canOpen ? () => askChatForSimilar(m) : undefined}
+                        disabled={!canOpen}
+                        title={!canOpen ? "Чат доступен только для OPEN" : undefined}
                       >
                         <div
                           className={styles.similarImage}

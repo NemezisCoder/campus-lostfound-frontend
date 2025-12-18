@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import NavBtn from "./NavBtn";
 import AvatarMenu from "./AvatarMenu";
 import { View } from "../types/view";
 import styles from "./Header.module.css";
+import { fetchMe } from "../api/auth";
 
 export default function Header({
   view,
@@ -14,6 +16,35 @@ export default function Header({
   isAuthed: boolean;
   setIsAuthed: (b: boolean) => void;
 }) {
+  const [userLabel, setUserLabel] = useState("Профиль");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isAuthed) {
+      setUserLabel("Профиль");
+      return;
+    }
+
+    fetchMe()
+      .then((me: any) => {
+        if (cancelled) return;
+
+        const name = String(me?.name ?? "").trim();
+        const surname = String(me?.surname ?? "").trim();
+        const label = `${name}${surname ? " " + surname : ""}`.trim();
+
+        setUserLabel(label || "Профиль");
+      })
+      .catch(() => {
+        if (!cancelled) setUserLabel("Профиль");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthed]);
+
   return (
     <header className={styles.header}>
       <div className={styles.logo}>Campus Lost&Found</div>
@@ -38,12 +69,16 @@ export default function Header({
         <NavBtn active={view === "chat"} onClick={() => setView("chat")}>
           Чат
         </NavBtn>
-        <NavBtn
-          active={view === "moderation"}
-          onClick={() => setView("moderation")}
-        >
-          Модерация
-        </NavBtn>
+
+        {/* Модерация отключена, файл не удаляем */}
+        {false && (
+          <NavBtn
+            active={view === "moderation"}
+            onClick={() => setView("moderation")}
+          >
+            Модерация
+          </NavBtn>
+        )}
 
         {!isAuthed ? (
           <div className={styles.authButtons}>
@@ -62,10 +97,12 @@ export default function Header({
           </div>
         ) : (
           <AvatarMenu
+            userLabel={userLabel}
             onProfile={() => setView("profile")}
             onSettings={() => setView("account")}
             onLogout={() => {
               setIsAuthed(false);
+              setUserLabel("Профиль");
               setView("login");
             }}
           />

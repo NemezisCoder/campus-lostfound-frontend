@@ -146,7 +146,8 @@ export default function App() {
         />
         <Route path="/create" element={<CreateView onItemCreated={addItem} />} />
         <Route path="/chat" element={<ChatView />} />
-        <Route path="/moderation" element={<ModerationView />} />
+        <Route path="/moderation" element={<MapView drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} items={items} />} />
+
 
         <Route
           path="/login"

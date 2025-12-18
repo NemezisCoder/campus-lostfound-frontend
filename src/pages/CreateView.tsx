@@ -105,9 +105,9 @@ export default function CreateView({ onItemCreated }: Props) {
       const raw = await searchSimilarByImage(file, 8);
 
       // Show only opposite type matches (lost -> found, found -> lost).
-      const targetType = getTargetType(selectedType);
-      const filtered = raw.filter((m) => m.item.type === targetType);
 
+      const filtered = raw; // временно для проверки
+      console.log("raw", raw);
       setSimilar(filtered);
       return filtered;
     } catch (err: any) {
@@ -159,7 +159,7 @@ export default function CreateView({ onItemCreated }: Props) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSuccess(null);
-
+    if (!imageFile) return setError("Прикрепите фото, чтобы опубликовать пост");
     if (!type) return setError("Выберите: Потерял или Нашёл");
     if (!title.trim()) return setError("Введите название");
     if (!category) return setError("Выберите категорию");
@@ -174,7 +174,6 @@ export default function CreateView({ onItemCreated }: Props) {
       const payload: ItemCreatePayload = {
         title,
         type,
-        status: "OPEN",
         category: category as CategoryType,
         roomId: room as RoomId,
         roomLabel: meta.roomLabel,
@@ -182,6 +181,7 @@ export default function CreateView({ onItemCreated }: Props) {
         timeAgo: "только что",
         description,
       };
+
 
       const created = await createItem(payload);
       const finalItem = imageFile ? await uploadItemImage(created.id, imageFile) : created;
@@ -350,7 +350,12 @@ export default function CreateView({ onItemCreated }: Props) {
           {error && <div className={styles.error}>{error}</div>}
           {success && <div className={styles.success}>{success}</div>}
 
-          <button type="submit" className={styles.submitBtn} disabled={isSubmitting}>
+          <button
+            type="submit"
+            className={styles.submitBtn}
+            disabled={isSubmitting || !imageFile}
+            title={!imageFile ? "Сначала прикрепите фото" : undefined}
+          >
             {isSubmitting ? "Публикуем..." : "Опубликовать"}
           </button>
         </form>
@@ -413,7 +418,7 @@ export default function CreateView({ onItemCreated }: Props) {
                   role="button"
                   tabIndex={0}
                   onClick={() =>
-                    navigate("/chat", {
+                    navigate(`/chat?itemId=${m.item.id}&ownerId=${m.item.owner_id}`, {
                       state: {
                         itemId: m.item.id,
                         ownerId: m.item.owner_id,
@@ -423,7 +428,7 @@ export default function CreateView({ onItemCreated }: Props) {
                   }
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      navigate("/chat", {
+                      navigate(`/chat?itemId=${m.item.id}&ownerId=${m.item.owner_id}`, {
                         state: {
                           itemId: m.item.id,
                           ownerId: m.item.owner_id,

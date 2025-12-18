@@ -22,6 +22,15 @@ export default function ItemCard({
 }: ItemCardProps) {
   const img = resolveMediaUrl(imageUrl);
 
+  const statusClass =
+    status === "OPEN"
+      ? styles.statusOpen
+      : status === "IN_PROGRESS"
+        ? styles.statusInProgress
+        : status === "CLOSED"
+          ? styles.statusClosed
+          : styles.statusOpen;
+
   return (
     <div className={styles.card} onClick={onClick} onDoubleClick={onDoubleClick}>
       <div
@@ -40,8 +49,10 @@ export default function ItemCard({
       <div className={styles.body}>
         <div className={styles.header}>
           <div className={styles.title}>{title}</div>
-          <span className={styles.status}>{status}</span>
+
+          <span className={`${styles.statusChip} ${statusClass}`}>{status}</span>
         </div>
+
         <div className={styles.meta}>
           {place} • {timeAgo}
         </div>

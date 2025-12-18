@@ -21,7 +21,7 @@ export type MapItem = {
     image_url?: string | null;
 };
 
-export type ItemCreatePayload = Omit<MapItem, "id" | "owner_id">;
+export type ItemCreatePayload = Omit<MapItem, "id" | "owner_id" | "status">;
 
 export async function fetchItems(): Promise<MapItem[]> {
     const res = await api.get<MapItem[]>("/items/");
