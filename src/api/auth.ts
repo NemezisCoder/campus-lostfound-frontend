@@ -9,6 +9,10 @@ export type AuthResponse = {
 export type MeResponse = {
     id: number;
     email?: string;
+    name?: string;
+    surname?: string;
+    role?: "user" | "admin";
+    is_banned?: boolean;
 };
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
@@ -34,5 +38,14 @@ export async function logout() {
 
 export async function fetchMe(): Promise<MeResponse> {
     const res = await api.get<MeResponse>("/auth/me");
-    return res.data;
+    // Be tolerant to older backend responses that returned only {id, email}
+    const raw = res.data ?? ({} as MeResponse);
+    return {
+        id: raw.id,
+        email: raw.email,
+        name: raw.name ?? "",
+        surname: raw.surname ?? "",
+        role: raw.role ?? "user",
+        is_banned: raw.is_banned ?? false,
+    };
 }

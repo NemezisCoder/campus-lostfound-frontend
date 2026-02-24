@@ -4,7 +4,7 @@ import Header from "./components/Header";
 import MapView from "./pages/MapView/MapView";
 import CreateView from "./pages/CreateView";
 import ChatView from "./pages/ChatView";
-import ModerationView from "./pages/ModerationView";
+import AdminView from "./pages/AdminView";
 import LoginView from "./pages/Auth/LoginView";
 import SignUpView from "./pages/Auth/SignUpView";
 import ForgotView from "./pages/Auth/ForgotView";
@@ -14,20 +14,36 @@ import ChangePasswordView from "./pages/Account/ChangePasswordView";
 import TestRunner from "./tests/TestRunner";
 import type { MapItem } from "./api/items";
 import { fetchItems } from "./api/items";
-import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { Routes, Route, useNavigate, useLocation, Navigate, Outlet } from "react-router-dom";
 
 import { api, setAccessToken } from "./api/client"; // ✅ добавили
+import { fetchMe, type MeResponse } from "./api/auth";
 import styles from "./App.module.css";
 
 export default function App() {
   const [view, setView] = useState<View>("map");
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [isAuthed, setIsAuthed] = useState(false);
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [meLoaded, setMeLoaded] = useState(false);
   const [dark, setDark] = useState(false);
   const [showTests, setShowTests] = useState(false);
   const [items, setItems] = useState<MapItem[]>([]);
   const navigate = useNavigate();
   const location = useLocation();
+
+  async function loadMe() {
+    try {
+      const m = await fetchMe();
+      setMe(m);
+      setIsAuthed(true);
+    } catch {
+      setMe(null);
+      setIsAuthed(false);
+    } finally {
+      setMeLoaded(true);
+    }
+  }
 
   // ✅ 1) На старте пытаемся восстановить сессию через refresh-cookie
   useEffect(() => {
@@ -35,10 +51,12 @@ export default function App() {
       try {
         const r = await api.post("/auth/refresh");
         setAccessToken(r.data.access_token);
-        setIsAuthed(true);
+        await loadMe();
       } catch {
         setAccessToken(null);
+        setMe(null);
         setIsAuthed(false);
+        setMeLoaded(true);
       }
     })();
   }, []);
@@ -68,6 +86,9 @@ export default function App() {
         break;
       case "/moderation":
         setView("moderation");
+        break;
+      case "/admin":
+        setView("admin");
         break;
       case "/login":
         setView("login");
@@ -107,6 +128,9 @@ export default function App() {
       case "moderation":
         navigate("/moderation");
         break;
+      case "admin":
+        navigate("/admin");
+        break;
       case "login":
         navigate("/login");
         break;
@@ -128,13 +152,40 @@ export default function App() {
     }
   };
 
+  function RequireAuth() {
+    if (!meLoaded) return <div style={{ padding: 16 }}>Loading…</div>;
+    return me ? <Outlet /> : <Navigate to="/login" replace />;
+  }
+
+  function RequireNotBanned() {
+    if (!meLoaded) return <div style={{ padding: 16 }}>Loading…</div>;
+    if (!me) return <Navigate to="/login" replace />;
+    if (me.is_banned) return <Navigate to="/" replace />;
+    return <Outlet />;
+  }
+
+  function RequireAdmin() {
+    if (!meLoaded) return <div style={{ padding: 16 }}>Loading…</div>;
+    if (!me) return <Navigate to="/login" replace />;
+    if (me.is_banned) return <Navigate to="/" replace />;
+    if (me.role !== "admin") return <Navigate to="/" replace />;
+    return <Outlet />;
+  }
+
   return (
     <div className={dark ? `${styles.app} ${styles.appDark}` : styles.app}>
       <Header
         view={view}
         setView={handleSetView}
-        isAuthed={isAuthed}
-        setIsAuthed={setIsAuthed}
+        me={me}
+        meLoaded={meLoaded}
+        onLogout={() => {
+          setAccessToken(null);
+          setMe(null);
+          setIsAuthed(false);
+          setMeLoaded(true);
+          handleSetView("login");
+        }}
       />
 
       <Routes>
@@ -144,8 +195,15 @@ export default function App() {
             <MapView drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} items={items} />
           }
         />
-        <Route path="/create" element={<CreateView onItemCreated={addItem} />} />
-        <Route path="/chat" element={<ChatView />} />
+        <Route element={<RequireNotBanned />}>
+          <Route path="/create" element={<CreateView onItemCreated={addItem} />} />
+          <Route path="/chat" element={<ChatView />} />
+        </Route>
+
+        <Route element={<RequireAdmin />}>
+          <Route path="/admin" element={<AdminView />} />
+        </Route>
+
         <Route path="/moderation" element={<MapView drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} items={items} />} />
 
 
@@ -154,8 +212,7 @@ export default function App() {
           element={
             <LoginView
               onSignIn={() => {
-                setIsAuthed(true);
-                handleSetView("map");
+                void loadMe().then(() => handleSetView("map"));
               }}
               onGoSignUp={() => handleSetView("register")}
               onForgot={() => handleSetView("forgot")}
@@ -167,8 +224,7 @@ export default function App() {
           element={
             <SignUpView
               onSignUp={() => {
-                setIsAuthed(true);
-                handleSetView("map");
+                void loadMe().then(() => handleSetView("map"));
               }}
               onGoSignIn={() => handleSetView("login")}
             />
@@ -176,26 +232,28 @@ export default function App() {
         />
         <Route path="/forgot" element={<ForgotView onBack={() => handleSetView("login")} />} />
 
-        <Route
-          path="/profile"
-          element={<ProfileView onOpenSettings={() => handleSetView("account")} />}
-        />
-        <Route
-          path="/account"
-          element={
-            <AccountSettingsView
-              dark={dark}
-              setDark={setDark}
-              onOpenChangePassword={() => handleSetView("change_password")}
-              onBack={() => handleSetView("profile")}
-              onOpenAuth={() => handleSetView("login")}
-            />
-          }
-        />
-        <Route
-          path="/account/password"
-          element={<ChangePasswordView onBack={() => handleSetView("account")} />}
-        />
+        <Route element={<RequireAuth />}>
+          <Route
+            path="/profile"
+            element={<ProfileView onOpenSettings={() => handleSetView("account")} />}
+          />
+          <Route
+            path="/account"
+            element={
+              <AccountSettingsView
+                dark={dark}
+                setDark={setDark}
+                onOpenChangePassword={() => handleSetView("change_password")}
+                onBack={() => handleSetView("profile")}
+                onOpenAuth={() => handleSetView("login")}
+              />
+            }
+          />
+          <Route
+            path="/account/password"
+            element={<ChangePasswordView onBack={() => handleSetView("account")} />}
+          />
+        </Route>
       </Routes>
 
 

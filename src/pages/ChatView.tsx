@@ -58,6 +58,15 @@ export default function ChatView() {
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [closeLoading, setCloseLoading] = useState(false);
 
+  // ✅ модалка жалобы
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState<"scam" | "false_connection" | "other">(
+    "scam"
+  );
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportMsg, setReportMsg] = useState<string | null>(null);
+
   const socketRef = useRef<Socket | null>(null);
 
   // helper: загрузить threads
@@ -274,6 +283,32 @@ export default function ChatView() {
     }
   }
 
+  async function submitReport() {
+    if (!activeThreadId) return;
+    setReportLoading(true);
+    setReportMsg(null);
+
+    try {
+      await api.post(`/chat/threads/${activeThreadId}/report`, {
+        reason: reportReason,
+        details: reportReason === "other" ? reportDetails : null,
+      });
+      setReportMsg("Жалоба отправлена.");
+      setReportOpen(false);
+      setReportDetails("");
+      setReportReason("scam");
+    } catch (e: any) {
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail;
+
+      if (status === 409) setReportMsg("Жалоба уже отправлена по этому чату.");
+      else if (status === 403) setReportMsg("Ваш аккаунт ограничен.");
+      else setReportMsg(detail ?? "Не удалось отправить жалобу.");
+    } finally {
+      setReportLoading(false);
+    }
+  }
+
   const send = () => {
     const s = socketRef.current;
     if (!s || !activeThreadId) return;
@@ -394,20 +429,35 @@ export default function ChatView() {
               )}
             </div>
 
-            {/* ✅ кнопка закрытия */}
-            {activeThreadId && !isClosed && !iRequestedClose ? (
-              <button
-                type="button"
-                className={styles.closeChatBtn}
-                onClick={() => setCloseConfirmOpen(true)}
-                disabled={closeLoading}
-              >
-                Завершить чат
-              </button>
-            ) : activeThreadId && !isClosed && iRequestedClose ? (
-              <button type="button" disabled style={{ opacity: 0.7 }}>
-                Ожидаем второго участника…
-              </button>
+            {activeThreadId && !isClosed ? (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button
+                  type="button"
+                  className={styles.reportBtn}
+                  onClick={() => {
+                    setReportMsg(null);
+                    setReportOpen(true);
+                  }}
+                  disabled={reportLoading}
+                >
+                  Пожаловаться
+                </button>
+
+                {!iRequestedClose ? (
+                  <button
+                    type="button"
+                    className={styles.closeChatBtn}
+                    onClick={() => setCloseConfirmOpen(true)}
+                    disabled={closeLoading}
+                  >
+                    Завершить чат
+                  </button>
+                ) : (
+                  <button type="button" disabled style={{ opacity: 0.7 }}>
+                    Ожидаем второго участника…
+                  </button>
+                )}
+              </div>
             ) : null}
           </div>
         </div>
@@ -503,6 +553,86 @@ export default function ChatView() {
                   disabled={closeLoading}
                 >
                   Да, завершить
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {reportOpen && (
+          <div
+            className={styles.modalOverlay}
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setReportOpen(false)}
+          >
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.modalTitle}>Пожаловаться</div>
+              <div className={styles.modalText}>Выберите причину жалобы:</div>
+
+              <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+                <label>
+                  <input
+                    type="radio"
+                    name="reason"
+                    checked={reportReason === "scam"}
+                    onChange={() => setReportReason("scam")}
+                  />{" "}
+                  Мошенничество
+                </label>
+
+                <label>
+                  <input
+                    type="radio"
+                    name="reason"
+                    checked={reportReason === "false_connection"}
+                    onChange={() => setReportReason("false_connection")}
+                  />{" "}
+                  Ложное соединение
+                </label>
+
+                <label>
+                  <input
+                    type="radio"
+                    name="reason"
+                    checked={reportReason === "other"}
+                    onChange={() => setReportReason("other")}
+                  />{" "}
+                  Другое
+                </label>
+
+                {reportReason === "other" && (
+                  <textarea
+                    value={reportDetails}
+                    onChange={(e) => setReportDetails(e.target.value)}
+                    placeholder="Опишите причину..."
+                    style={{ width: "100%", minHeight: 80, padding: 8 }}
+                  />
+                )}
+
+                {reportMsg && <div style={{ color: "crimson" }}>{reportMsg}</div>}
+              </div>
+
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.modalSecondary}
+                  onClick={() => setReportOpen(false)}
+                  disabled={reportLoading}
+                >
+                  Отмена
+                </button>
+
+                <button
+                  type="button"
+                  className={styles.modalPrimary}
+                  onClick={() => void submitReport()}
+                  disabled={
+                    reportLoading ||
+                    (reportReason === "other" && !reportDetails.trim())
+                  }
+                >
+                  Отправить
                 </button>
               </div>
             </div>

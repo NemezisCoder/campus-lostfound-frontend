@@ -3,6 +3,7 @@ export type View =
   | 'create'
   | 'chat'
   | 'moderation'
+  | 'admin'
   | 'login'
   | 'register'
   | 'forgot'

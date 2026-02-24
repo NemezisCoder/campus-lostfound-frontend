@@ -1,49 +1,31 @@
-import { useEffect, useState } from "react";
 import NavBtn from "./NavBtn";
 import AvatarMenu from "./AvatarMenu";
 import { View } from "../types/view";
 import styles from "./Header.module.css";
-import { fetchMe } from "../api/auth";
+import type { MeResponse } from "../api/auth";
 
 export default function Header({
   view,
   setView,
-  isAuthed,
-  setIsAuthed,
+  me,
+  meLoaded,
+  onLogout,
 }: {
   view: View;
   setView: (v: View) => void;
-  isAuthed: boolean;
-  setIsAuthed: (b: boolean) => void;
+  me: MeResponse | null;
+  meLoaded: boolean;
+  onLogout: () => void;
 }) {
-  const [userLabel, setUserLabel] = useState("Профиль");
+  const isAuthed = !!me;
+  const isBanned = !!me?.is_banned;
+  const isAdmin = me?.role === "admin";
 
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!isAuthed) {
-      setUserLabel("Профиль");
-      return;
-    }
-
-    fetchMe()
-      .then((me: any) => {
-        if (cancelled) return;
-
-        const name = String(me?.name ?? "").trim();
-        const surname = String(me?.surname ?? "").trim();
-        const label = `${name}${surname ? " " + surname : ""}`.trim();
-
-        setUserLabel(label || "Профиль");
-      })
-      .catch(() => {
-        if (!cancelled) setUserLabel("Профиль");
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthed]);
+  const userLabel =
+    isAuthed && meLoaded
+      ? `${String(me?.name ?? "").trim()}${String(me?.surname ?? "").trim() ? " " + String(me?.surname ?? "").trim() : ""}`.trim() ||
+        "Профиль"
+      : "Профиль";
 
   return (
     <header className={styles.header}>
@@ -63,12 +45,24 @@ export default function Header({
         <NavBtn active={view === "map"} onClick={() => setView("map")}>
           Карта
         </NavBtn>
-        <NavBtn active={view === "create"} onClick={() => setView("create")}>
-          Создать пост
-        </NavBtn>
-        <NavBtn active={view === "chat"} onClick={() => setView("chat")}>
-          Чат
-        </NavBtn>
+
+        {isAuthed && !isBanned && (
+          <NavBtn active={view === "create"} onClick={() => setView("create")}>
+            Создать пост
+          </NavBtn>
+        )}
+
+        {isAuthed && !isBanned && (
+          <NavBtn active={view === "chat"} onClick={() => setView("chat")}>
+            Чат
+          </NavBtn>
+        )}
+
+        {isAuthed && !isBanned && isAdmin && (
+          <NavBtn active={view === "admin"} onClick={() => setView("admin")}>
+            Администрирование
+          </NavBtn>
+        )}
 
         {/* Модерация отключена, файл не удаляем */}
         {false && (
@@ -82,10 +76,7 @@ export default function Header({
 
         {!isAuthed ? (
           <div className={styles.authButtons}>
-            <button
-              onClick={() => setView("login")}
-              className={styles.authButton}
-            >
+            <button onClick={() => setView("login")} className={styles.authButton}>
               Войти
             </button>
             <button
@@ -100,11 +91,7 @@ export default function Header({
             userLabel={userLabel}
             onProfile={() => setView("profile")}
             onSettings={() => setView("account")}
-            onLogout={() => {
-              setIsAuthed(false);
-              setUserLabel("Профиль");
-              setView("login");
-            }}
+            onLogout={onLogout}
           />
         )}
       </div>

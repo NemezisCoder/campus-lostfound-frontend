@@ -1,0 +1,122 @@
+.root {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  height: calc(100vh - 4rem);
+}
+
+.sidebar {
+  border-right: 1px solid #ddd;
+  padding: 12px;
+  overflow: auto;
+}
+
+.main {
+  padding: 12px;
+  overflow: auto;
+}
+
+.title {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.muted {
+  opacity: 0.7;
+}
+
+.error {
+  margin-top: 12px;
+  color: crimson;
+}
+
+.reportItem,
+.reportItemActive {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 8px;
+  text-align: left;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background: white;
+  cursor: pointer;
+}
+
+.reportItemActive {
+  outline: 2px solid #333;
+}
+
+.reportTop {
+  display: flex;
+  justify-content: space-between;
+}
+
+.reportMeta {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+.status {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.card {
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: white;
+}
+
+.cardTitle {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.row {
+  margin-top: 6px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.banBtn {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.rejectBtn {
+  background: #111;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.chatBox {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 10px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.msg {
+  border-bottom: 1px solid #eee;
+  padding: 8px 0;
+}
+
+.msgMeta {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
