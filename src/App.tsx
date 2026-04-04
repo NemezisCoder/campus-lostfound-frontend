@@ -16,8 +16,8 @@ import type { MapItem } from "./api/items";
 import { fetchItems } from "./api/items";
 import { Routes, Route, useNavigate, useLocation, Navigate, Outlet } from "react-router-dom";
 
-import { api, setAccessToken } from "./api/client"; // ✅ добавили
-import { fetchMe, type MeResponse } from "./api/auth";
+import { clearTokens, getRefreshToken, setAccessToken, setRefreshToken } from "./api/client";
+import { fetchMe, logout as apiLogout, type MeResponse } from "./api/auth";
 import styles from "./App.module.css";
 
 export default function App() {
@@ -45,15 +45,66 @@ export default function App() {
     }
   }
 
-  // ✅ 1) На старте пытаемся восстановить сессию через refresh-cookie
+  async function doLogout() {
+    try {
+      await apiLogout();
+    } finally {
+      clearTokens();
+      setMe(null);
+      setIsAuthed(false);
+      setMeLoaded(true);
+      handleSetView("login");
+    }
+  }
+
+  useEffect(() => {
+    const handler = () => {
+      clearTokens();
+      setMe(null);
+      setIsAuthed(false);
+      setMeLoaded(true);
+      handleSetView("login");
+    };
+
+    window.addEventListener("auth:invalid", handler);
+    return () => window.removeEventListener("auth:invalid", handler);
+  }, []);
+
   useEffect(() => {
     (async () => {
+      const storedRefreshToken = getRefreshToken();
+
+      if (!storedRefreshToken) {
+        clearTokens();
+        setMe(null);
+        setIsAuthed(false);
+        setMeLoaded(true);
+        return;
+      }
+
       try {
-        const r = await api.post("/auth/refresh");
-        setAccessToken(r.data.access_token);
+        const r = await fetch("/api/v1/auth/refresh", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            refresh_token: storedRefreshToken,
+          }),
+        });
+
+        if (!r.ok) {
+          throw new Error("Refresh failed");
+        }
+
+        const data = await r.json();
+
+        setAccessToken(data.access_token);
+        setRefreshToken(data.refresh_token);
+
         await loadMe();
       } catch {
-        setAccessToken(null);
+        clearTokens();
         setMe(null);
         setIsAuthed(false);
         setMeLoaded(true);
@@ -61,7 +112,6 @@ export default function App() {
     })();
   }, []);
 
-  // ✅ 2) Items грузим через axios (у тебя fetchItems уже axios)
   useEffect(() => {
     fetchItems()
       .then((data) => setItems(data))
@@ -72,7 +122,6 @@ export default function App() {
     setItems((prev) => [newItem, ...prev]);
   }
 
-  // URL -> view
   useEffect(() => {
     switch (location.pathname) {
       case "/":
@@ -180,11 +229,7 @@ export default function App() {
         me={me}
         meLoaded={meLoaded}
         onLogout={() => {
-          setAccessToken(null);
-          setMe(null);
-          setIsAuthed(false);
-          setMeLoaded(true);
-          handleSetView("login");
+          void doLogout();
         }}
       />
 
@@ -195,6 +240,7 @@ export default function App() {
             <MapView drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} items={items} />
           }
         />
+
         <Route element={<RequireNotBanned />}>
           <Route path="/create" element={<CreateView onItemCreated={addItem} />} />
           <Route path="/chat" element={<ChatView />} />
@@ -204,8 +250,12 @@ export default function App() {
           <Route path="/admin" element={<AdminView />} />
         </Route>
 
-        <Route path="/moderation" element={<MapView drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} items={items} />} />
-
+        <Route
+          path="/moderation"
+          element={
+            <MapView drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} items={items} />
+          }
+        />
 
         <Route
           path="/login"
@@ -219,6 +269,7 @@ export default function App() {
             />
           }
         />
+
         <Route
           path="/register"
           element={
@@ -230,6 +281,7 @@ export default function App() {
             />
           }
         />
+
         <Route path="/forgot" element={<ForgotView onBack={() => handleSetView("login")} />} />
 
         <Route element={<RequireAuth />}>
@@ -255,8 +307,6 @@ export default function App() {
           />
         </Route>
       </Routes>
-
-
 
       {showTests && <TestRunner setView={handleSetView} />}
     </div>
