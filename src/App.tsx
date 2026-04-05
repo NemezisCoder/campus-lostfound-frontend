@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Routes, Route, useNavigate, useLocation, Navigate, Outlet } from "react-router-dom";
+
 import { View } from "./types/view";
 import Header from "./components/Header";
 import MapView from "./pages/MapView/MapView";
@@ -12,13 +14,82 @@ import ProfileView from "./pages/ProfileView";
 import AccountSettingsView from "./pages/Account/AccountSettingsView";
 import ChangePasswordView from "./pages/Account/ChangePasswordView";
 import TestRunner from "./tests/TestRunner";
-import type { MapItem } from "./api/items";
-import { fetchItems } from "./api/items";
-import { Routes, Route, useNavigate, useLocation, Navigate, Outlet } from "react-router-dom";
+
+import type {
+  MapItem,
+  ItemsQuery,
+  ItemType,
+  StatusType,
+  CategoryType,
+  ItemSort,
+} from "./api/items";
+import { fetchItemsPage } from "./api/items";
 
 import { clearTokens, getRefreshToken, setAccessToken, setRefreshToken } from "./api/client";
 import { fetchMe, logout as apiLogout, type MeResponse } from "./api/auth";
 import styles from "./App.module.css";
+
+function isItemType(value: string | null): value is ItemType {
+  return value === "lost" || value === "found";
+}
+
+function isStatusType(value: string | null): value is StatusType {
+  return value === "OPEN" || value === "IN_PROGRESS" || value === "CLOSED";
+}
+
+function isCategoryType(value: string | null): value is CategoryType {
+  return (
+    value === "electronics" ||
+    value === "clothes" ||
+    value === "personal" ||
+    value === "documents"
+  );
+}
+
+function isItemSort(value: string | null): value is ItemSort {
+  return (
+    value === "id_desc" ||
+    value === "id_asc" ||
+    value === "title_asc" ||
+    value === "title_desc"
+  );
+}
+
+function parsePositiveInt(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
+}
+
+function buildItemsQuery(search: string): ItemsQuery {
+  const params = new URLSearchParams(search);
+
+  const query: ItemsQuery = {};
+
+  const q = params.get("q")?.trim();
+  if (q) query.q = q;
+
+  const type = params.get("type");
+  if (isItemType(type)) query.type = type;
+
+  const status = params.get("status");
+  if (isStatusType(status)) query.status = status;
+
+  const category = params.get("category");
+  if (isCategoryType(category)) query.category = category;
+
+  const sort = params.get("sort");
+  if (isItemSort(sort)) query.sort = sort;
+
+  const page = parsePositiveInt(params.get("page"));
+  if (page !== undefined) query.page = page;
+
+  const pageSize = parsePositiveInt(params.get("page_size"));
+  if (pageSize !== undefined) query.page_size = pageSize;
+
+  return query;
+}
 
 export default function App() {
   const [view, setView] = useState<View>("map");
@@ -28,7 +99,12 @@ export default function App() {
   const [meLoaded, setMeLoaded] = useState(false);
   const [dark, setDark] = useState(false);
   const [showTests, setShowTests] = useState(false);
+
   const [items, setItems] = useState<MapItem[]>([]);
+  const [itemsTotal, setItemsTotal] = useState(0);
+  const [itemsPage, setItemsPage] = useState(1);
+  const [itemsPageSize, setItemsPageSize] = useState(20);
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -113,13 +189,29 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    fetchItems()
-      .then((data) => setItems(data))
-      .catch((e) => console.error("Failed to load items:", e));
-  }, []);
+    const isItemsRoute = location.pathname === "/" || location.pathname === "/moderation";
+
+    if (!isItemsRoute) {
+      return;
+    }
+
+    const query = buildItemsQuery(location.search);
+
+    fetchItemsPage(query)
+      .then((data) => {
+        setItems(data.items);
+        setItemsTotal(data.total);
+        setItemsPage(data.page);
+        setItemsPageSize(data.page_size);
+      })
+      .catch((e) => {
+        console.error("Failed to load items:", e);
+      });
+  }, [location.pathname, location.search]);
 
   function addItem(newItem: MapItem) {
     setItems((prev) => [newItem, ...prev]);
+    setItemsTotal((prev) => prev + 1);
   }
 
   useEffect(() => {
@@ -164,6 +256,7 @@ export default function App() {
 
   const handleSetView = (v: View) => {
     setView(v);
+
     switch (v) {
       case "map":
         navigate("/");
@@ -237,7 +330,11 @@ export default function App() {
         <Route
           path="/"
           element={
-            <MapView drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} items={items} />
+            <MapView
+              drawerOpen={drawerOpen}
+              setDrawerOpen={setDrawerOpen}
+              items={items}
+            />
           }
         />
 
@@ -253,7 +350,11 @@ export default function App() {
         <Route
           path="/moderation"
           element={
-            <MapView drawerOpen={drawerOpen} setDrawerOpen={setDrawerOpen} items={items} />
+            <MapView
+              drawerOpen={drawerOpen}
+              setDrawerOpen={setDrawerOpen}
+              items={items}
+            />
           }
         />
 

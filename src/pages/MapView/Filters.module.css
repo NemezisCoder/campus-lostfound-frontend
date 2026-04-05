@@ -1,9 +1,12 @@
 /* src/pages/MapView/Filters.module.css */
 
 .root {
-  @apply flex items-center gap-2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 
 .select {
-  @apply px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 dark:border-slate-700;
+  min-width: 180px;
 }

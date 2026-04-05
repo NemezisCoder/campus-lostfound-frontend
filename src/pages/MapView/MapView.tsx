@@ -1,63 +1,63 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Filters from "./Filters";
 import ItemCard from "./ItemCard";
 import styles from "./MapView.module.css";
 import { MAIN_MAP_COORDS } from "../../data/roomCoords";
-import type {
-  MapItem,
-  ItemType,
-  CategoryType,
-  StatusType,
-  SimilarMatch,
-} from "../../api/items";
+import type { MapItem, ItemType, SimilarMatch } from "../../api/items";
 import { resolveMediaUrl } from "../../api/media";
 import { deduplicateItem } from "../../api/items";
 import { fetchMe } from "../../api/auth";
 
-type TypeFilter = "all" | ItemType;
-type CategoryFilter = "all" | CategoryType;
-type StatusFilter = "all" | StatusType;
+function parsePositiveInt(value: string | null, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
 
 export default function MapView({
   drawerOpen,
   setDrawerOpen,
   items,
+  itemsTotal,
+  itemsPage,
+  itemsPageSize,
 }: {
   drawerOpen: boolean;
   setDrawerOpen: (b: boolean) => void;
   items: MapItem[];
+  itemsTotal?: number;
+  itemsPage?: number;
+  itemsPageSize?: number;
 }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [selectedId, setSelectedId] = useState<number | null>(
-    items[0]?.id ?? null
-  );
+  const currentPage = itemsPage ?? parsePositiveInt(searchParams.get("page"), 1);
+  const currentPageSize = itemsPageSize ?? parsePositiveInt(searchParams.get("page_size"), 20);
+  const totalItems = itemsTotal ?? items.length;
 
-  // если items обновились и выбранного id больше нет — выбираем первый
+  const [selectedId, setSelectedId] = useState<number | null>(items[0]?.id ?? null);
+
   useEffect(() => {
     if (!items.length) {
       setSelectedId(null);
       return;
     }
+
     if (selectedId == null) {
       setSelectedId(items[0].id);
       return;
     }
+
     if (!items.some((x) => x.id === selectedId)) {
       setSelectedId(items[0].id);
     }
   }, [items, selectedId]);
 
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
-  // Similar (ИИ)
   const [similarCandidates, setSimilarCandidates] = useState<SimilarMatch[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
 
-  // Confirm modal
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmText, setConfirmText] = useState<string>("");
   const [pendingGo, setPendingGo] = useState<null | (() => void)>(null);
@@ -76,14 +76,15 @@ export default function MapView({
 
   useEffect(() => {
     if (!confirmOpen) return;
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeConfirm();
     };
+
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [confirmOpen]);
 
-  // meId (только через /auth/me)
   const [meId, setMeId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -101,6 +102,7 @@ export default function MapView({
       cancelled = true;
     };
   }, []);
+
   const ensureMeId = async (): Promise<number | null> => {
     if (meId != null) return meId;
 
@@ -113,26 +115,9 @@ export default function MapView({
     }
   };
 
-  // Filter list and map items.
-  const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      const byType = typeFilter === "all" ? true : item.type === typeFilter;
-      const byCategory =
-        categoryFilter === "all" ? true : item.category === categoryFilter;
-      const byStatus =
-        statusFilter === "all" ? true : item.status === statusFilter;
-      return byType && byCategory && byStatus;
-    });
-  }, [items, typeFilter, categoryFilter, statusFilter]);
-
-  // Keep selected item inside filtered set (fallback to first).
   const selectedItem = useMemo(() => {
-    return (
-      filteredItems.find((item) => item.id === selectedId) ??
-      filteredItems[0] ??
-      null
-    );
-  }, [filteredItems, selectedId]);
+    return items.find((item) => item.id === selectedId) ?? items[0] ?? null;
+  }, [items, selectedId]);
 
   const markerStyle = useMemo(() => {
     if (!selectedItem) return undefined;
@@ -149,6 +134,7 @@ export default function MapView({
     if (selectedItem.owner_id === meId) return false;
     return selectedItem.status === "OPEN";
   }, [selectedItem, meId]);
+
   const statusChipClass = useMemo(() => {
     const s = selectedItem?.status ?? "OPEN";
     if (s === "OPEN") return styles.statusOpen;
@@ -161,8 +147,6 @@ export default function MapView({
     return selectedItem?.type === "found" ? styles.typeFound : styles.typeLost;
   }, [selectedItem?.type]);
 
-  // кандидаты похожих
-  // кандидаты похожих
   useEffect(() => {
     if (!drawerOpen || !selectedItem) {
       setSimilarCandidates([]);
@@ -171,21 +155,14 @@ export default function MapView({
 
     let cancelled = false;
 
-    // ✅ 1) сразу убираем старые "похожие", чтобы не мигало/не показывало чужие
     setSimilarCandidates([]);
     setSimilarLoading(true);
 
-    console.log("selectedItem", selectedItem.id, selectedItem.image_url);
-
     deduplicateItem(selectedItem.id, 20, 0.0)
       .then((matches) => {
-        // ✅ 2) лог, сколько пришло и что именно
-        console.log("deduplicate matches:", matches.length, matches);
-
         if (!cancelled) setSimilarCandidates(matches);
       })
-      .catch((err) => {
-        console.log("deduplicate error:", err);
+      .catch(() => {
         if (!cancelled) setSimilarCandidates([]);
       })
       .finally(() => {
@@ -207,19 +184,17 @@ export default function MapView({
     const base = [...similarCandidates]
       .filter((m) => m.item?.id !== selectedItem.id)
       .filter((m) => m.item?.type === targetType)
-      .filter((m) => m.item?.status !== "CLOSED") // скрываем CLOSED
+      .filter((m) => m.item?.status !== "CLOSED")
       .sort((a, b) => b.similarity - a.similarity);
 
     const strong = base.filter((m) => m.similarity >= SIMILARITY_THRESHOLD);
 
-    // ✅ если сильных совпадений нет — показываем просто top-4 лучших
     return (strong.length ? strong : base).slice(0, 4);
   }, [similarCandidates, selectedItem]);
 
   const askChatForSimilar = async (m: SimilarMatch) => {
     const id = await ensureMeId();
     if (id == null) return;
-
     if (m.item.owner_id === id) return;
 
     openConfirm("Уверены, что хотите перейти в чат?", () => {
@@ -234,10 +209,7 @@ export default function MapView({
   };
 
   const askChatForItem = (item: MapItem) => {
-    // пока не знаем себя — ничего
     if (meId == null) return;
-
-    // если мой item — ничего
     if (item.owner_id === meId) return;
 
     openConfirm("Уверены, что хотите перейти в чат?", () => {
@@ -249,6 +221,27 @@ export default function MapView({
       });
     });
   };
+
+  const updatePage = (page: number) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+
+      if (page <= 1) {
+        next.delete("page");
+      } else {
+        next.set("page", String(page));
+      }
+
+      return next;
+    });
+  };
+
+  const canGoPrev = currentPage > 1;
+  const canGoNext =
+    typeof itemsTotal === "number"
+      ? currentPage * currentPageSize < itemsTotal
+      : items.length >= currentPageSize;
+
   return (
     <div className={styles.root} data-testid="map-root">
       <div className={styles.mapContainer}>
@@ -265,10 +258,9 @@ export default function MapView({
 
         {selectedItem && markerStyle && (
           <div
-            className={`${styles.marker} ${selectedItem.type === "lost"
-              ? styles.markerLost
-              : styles.markerFound
-              }`}
+            className={`${styles.marker} ${
+              selectedItem.type === "lost" ? styles.markerLost : styles.markerFound
+            }`}
             style={markerStyle}
           />
         )}
@@ -277,10 +269,7 @@ export default function MapView({
           <div className={styles.drawer}>
             <div className={styles.drawerHeader}>
               <div className={styles.drawerTitle}>{selectedItem.title}</div>
-              <button
-                onClick={() => setDrawerOpen(false)}
-                className={styles.closeBtn}
-              >
+              <button onClick={() => setDrawerOpen(false)} className={styles.closeBtn}>
                 ×
               </button>
             </div>
@@ -289,24 +278,22 @@ export default function MapView({
               className={styles.drawerImage}
               role={canChatSelected ? "button" : undefined}
               tabIndex={canChatSelected ? 0 : -1}
-              onClick={
-                canChatSelected ? () => askChatForItem(selectedItem) : undefined
-              }
+              onClick={canChatSelected ? () => askChatForItem(selectedItem) : undefined}
               onKeyDown={
                 canChatSelected
                   ? (e) => {
-                    if (e.key === "Enter") askChatForItem(selectedItem);
-                  }
+                      if (e.key === "Enter") askChatForItem(selectedItem);
+                    }
                   : undefined
               }
               style={{
                 ...(drawerImg
                   ? {
-                    backgroundImage: `url(${drawerImg})`,
-                    backgroundSize: "contain",
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "center",
-                  }
+                      backgroundImage: `url(${drawerImg})`,
+                      backgroundSize: "contain",
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "center",
+                    }
                   : {}),
                 cursor: canChatSelected ? "pointer" : "default",
               }}
@@ -341,14 +328,13 @@ export default function MapView({
                   ))}
                 </div>
               ) : top4Similar.length === 0 ? (
-                <div className={styles.similarEmpty}>
-                  Похожих объявлений пока нет
-                </div>
+                <div className={styles.similarEmpty}>Похожих объявлений пока нет</div>
               ) : (
                 <div className={styles.similarGrid}>
                   {top4Similar.map((m) => {
                     const img = resolveMediaUrl(m.item.image_url);
                     const canOpen = m.item.status === "OPEN";
+
                     return (
                       <button
                         key={m.item.id}
@@ -363,11 +349,11 @@ export default function MapView({
                           style={
                             img
                               ? {
-                                backgroundImage: `url(${img})`,
-                                backgroundSize: "contain",
-                                backgroundRepeat: "no-repeat",
-                                backgroundPosition: "center",
-                              }
+                                  backgroundImage: `url(${img})`,
+                                  backgroundSize: "contain",
+                                  backgroundRepeat: "no-repeat",
+                                  backgroundPosition: "center",
+                                }
                               : undefined
                           }
                         />
@@ -382,17 +368,22 @@ export default function MapView({
       </div>
 
       <aside className={styles.aside}>
-        <Filters
-          typeFilter={typeFilter}
-          setTypeFilter={setTypeFilter}
-          categoryFilter={categoryFilter}
-          setCategoryFilter={setCategoryFilter}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-        />
+        <Filters />
+
+        <div
+          style={{
+            marginTop: 10,
+            marginBottom: 10,
+            fontSize: 14,
+            opacity: 0.8,
+          }}
+        >
+          Показано: {items.length}
+          {typeof itemsTotal === "number" ? ` из ${itemsTotal}` : ""}
+        </div>
 
         <div className={styles.items}>
-          {filteredItems.map((item) => (
+          {items.map((item) => (
             <ItemCard
               key={item.id}
               title={item.title}
@@ -407,6 +398,52 @@ export default function MapView({
               }}
             />
           ))}
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+            marginTop: 12,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => updatePage(currentPage - 1)}
+            disabled={!canGoPrev}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid rgba(0,0,0,0.12)",
+              background: "white",
+              cursor: canGoPrev ? "pointer" : "default",
+              opacity: canGoPrev ? 1 : 0.5,
+            }}
+          >
+            Назад
+          </button>
+
+          <div style={{ fontSize: 14 }}>
+            Страница {currentPage}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => updatePage(currentPage + 1)}
+            disabled={!canGoNext}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid rgba(0,0,0,0.12)",
+              background: "white",
+              cursor: canGoNext ? "pointer" : "default",
+              opacity: canGoNext ? 1 : 0.5,
+            }}
+          >
+            Далее
+          </button>
         </div>
       </aside>
 
