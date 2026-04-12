@@ -8,6 +8,7 @@ import type { MapItem, ItemType, SimilarMatch } from "../../api/items";
 import { resolveMediaUrl } from "../../api/media";
 import { deduplicateItem } from "../../api/items";
 import { fetchMe } from "../../api/auth";
+import Seo from "../../components/Seo";
 
 function parsePositiveInt(value: string | null, fallback: number): number {
   const parsed = Number(value);
@@ -242,246 +243,269 @@ export default function MapView({
       ? currentPage * currentPageSize < itemsTotal
       : items.length >= currentPageSize;
 
+  const canonicalUrl = `${window.location.origin}/`;
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      url: `${window.location.origin}/items/${item.id}`,
+      name: item.title,
+    })),
+  };
+
   return (
-    <div className={styles.root} data-testid="map-root">
-      <div className={styles.mapContainer}>
-        <div className={styles.mapFrameWrapper}>
-          <iframe
-            title="Карта МТУСИ, 1 этаж"
-            src="https://mtuci-map.vercel.app/"
-            className={styles.mapFrame}
-            loading="lazy"
-          />
+    <>
+      <Seo
+        title="Campus Lost&Found - карта и список находок"
+        description="Сервис поиска потерянных и найденных вещей на кампусе МТУСИ"
+        canonicalUrl={canonicalUrl}
+        robots="index,follow"
+        jsonLd={jsonLd}
+      />
+
+      <div className={styles.root} data-testid="map-root">
+        <div className={styles.mapContainer}>
+          <div className={styles.mapFrameWrapper}>
+            <iframe
+              title="Карта МТУСИ, 1 этаж"
+              src="https://mtuci-map.vercel.app/"
+              className={styles.mapFrame}
+              loading="lazy"
+            />
+          </div>
+
+          <div className={styles.cityBadge}>📍 Кампус МТУСИ • 1 этаж</div>
+
+          {selectedItem && markerStyle && (
+            <div
+              className={`${styles.marker} ${
+                selectedItem.type === "lost" ? styles.markerLost : styles.markerFound
+              }`}
+              style={markerStyle}
+            />
+          )}
+
+          {drawerOpen && selectedItem && (
+            <div className={styles.drawer}>
+              <div className={styles.drawerHeader}>
+                <div className={styles.drawerTitle}>{selectedItem.title}</div>
+                <button onClick={() => setDrawerOpen(false)} className={styles.closeBtn}>
+                  ×
+                </button>
+              </div>
+
+              <div
+                className={styles.drawerImage}
+                role={canChatSelected ? "button" : undefined}
+                tabIndex={canChatSelected ? 0 : -1}
+                onClick={canChatSelected ? () => askChatForItem(selectedItem) : undefined}
+                onKeyDown={
+                  canChatSelected
+                    ? (e) => {
+                        if (e.key === "Enter") askChatForItem(selectedItem);
+                      }
+                    : undefined
+                }
+                style={{
+                  ...(drawerImg
+                    ? {
+                        backgroundImage: `url(${drawerImg})`,
+                        backgroundSize: "contain",
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "center",
+                      }
+                    : {}),
+                  cursor: canChatSelected ? "pointer" : "default",
+                }}
+                aria-label={
+                  canChatSelected ? "Перейти в чат с владельцем" : "Ваше объявление"
+                }
+              />
+
+              <div className={styles.chipsRow}>
+                <span className={`${styles.chip} ${typeChipClass}`}>
+                  {selectedItem.type === "lost" ? "Потеря" : "Нашёл"}
+                </span>
+
+                <span className={`${styles.chip} ${statusChipClass}`}>
+                  {selectedItem.status}
+                </span>
+
+                <span className={`${styles.chip} ${styles.chipPlace}`}>
+                  {selectedItem.roomLabel}, {selectedItem.floorLabel}
+                </span>
+              </div>
+
+              <p className={styles.desc}>{selectedItem.description}</p>
+
+              <div className={styles.similarBlock}>
+                <div className={styles.similarTitle}>Похожие (ИИ)</div>
+
+                {similarLoading ? (
+                  <div className={styles.similarGrid}>
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className={styles.similarSkeleton} />
+                    ))}
+                  </div>
+                ) : top4Similar.length === 0 ? (
+                  <div className={styles.similarEmpty}>Похожих объявлений пока нет</div>
+                ) : (
+                  <div className={styles.similarGrid}>
+                    {top4Similar.map((m) => {
+                      const img = resolveMediaUrl(m.item.image_url);
+                      const canOpen = m.item.status === "OPEN";
+
+                      return (
+                        <button
+                          key={m.item.id}
+                          type="button"
+                          className={styles.similarCardBtn}
+                          onClick={canOpen ? () => askChatForSimilar(m) : undefined}
+                          disabled={!canOpen}
+                          title={!canOpen ? "Чат доступен только для OPEN" : undefined}
+                        >
+                          <div
+                            className={styles.similarImage}
+                            style={
+                              img
+                                ? {
+                                    backgroundImage: `url(${img})`,
+                                    backgroundSize: "contain",
+                                    backgroundRepeat: "no-repeat",
+                                    backgroundPosition: "center",
+                                  }
+                                : undefined
+                            }
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className={styles.cityBadge}>📍 Кампус МТУСИ • 1 этаж</div>
+        <aside className={styles.aside}>
+          <Filters />
 
-        {selectedItem && markerStyle && (
           <div
-            className={`${styles.marker} ${
-              selectedItem.type === "lost" ? styles.markerLost : styles.markerFound
-            }`}
-            style={markerStyle}
-          />
-        )}
+            style={{
+              marginTop: 10,
+              marginBottom: 10,
+              fontSize: 14,
+              opacity: 0.8,
+            }}
+          >
+            Показано: {items.length}
+            {typeof itemsTotal === "number" ? ` из ${itemsTotal}` : ""}
+          </div>
 
-        {drawerOpen && selectedItem && (
-          <div className={styles.drawer}>
-            <div className={styles.drawerHeader}>
-              <div className={styles.drawerTitle}>{selectedItem.title}</div>
-              <button onClick={() => setDrawerOpen(false)} className={styles.closeBtn}>
-                ×
-              </button>
-            </div>
+          <div className={styles.items}>
+            {items.map((item) => (
+              <ItemCard
+                key={item.id}
+                title={item.title}
+                place={`${item.roomLabel}, ${item.floorLabel}`}
+                timeAgo={item.timeAgo}
+                status={item.status}
+                imageUrl={item.image_url}
+                onClick={() => setSelectedId(item.id)}
+                onDoubleClick={() => {
+                  setSelectedId(item.id);
+                  setDrawerOpen(true);
+                }}
+              />
+            ))}
+          </div>
 
-            <div
-              className={styles.drawerImage}
-              role={canChatSelected ? "button" : undefined}
-              tabIndex={canChatSelected ? 0 : -1}
-              onClick={canChatSelected ? () => askChatForItem(selectedItem) : undefined}
-              onKeyDown={
-                canChatSelected
-                  ? (e) => {
-                      if (e.key === "Enter") askChatForItem(selectedItem);
-                    }
-                  : undefined
-              }
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              marginTop: 12,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => updatePage(currentPage - 1)}
+              disabled={!canGoPrev}
               style={{
-                ...(drawerImg
-                  ? {
-                      backgroundImage: `url(${drawerImg})`,
-                      backgroundSize: "contain",
-                      backgroundRepeat: "no-repeat",
-                      backgroundPosition: "center",
-                    }
-                  : {}),
-                cursor: canChatSelected ? "pointer" : "default",
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid rgba(0,0,0,0.12)",
+                background: "white",
+                cursor: canGoPrev ? "pointer" : "default",
+                opacity: canGoPrev ? 1 : 0.5,
               }}
-              aria-label={
-                canChatSelected ? "Перейти в чат с владельцем" : "Ваше объявление"
-              }
-            />
+            >
+              Назад
+            </button>
 
-            <div className={styles.chipsRow}>
-              <span className={`${styles.chip} ${typeChipClass}`}>
-                {selectedItem.type === "lost" ? "Потеря" : "Нашёл"}
-              </span>
-
-              <span className={`${styles.chip} ${statusChipClass}`}>
-                {selectedItem.status}
-              </span>
-
-              <span className={`${styles.chip} ${styles.chipPlace}`}>
-                {selectedItem.roomLabel}, {selectedItem.floorLabel}
-              </span>
+            <div style={{ fontSize: 14 }}>
+              Страница {currentPage}
             </div>
 
-            <p className={styles.desc}>{selectedItem.description}</p>
+            <button
+              type="button"
+              onClick={() => updatePage(currentPage + 1)}
+              disabled={!canGoNext}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid rgba(0,0,0,0.12)",
+                background: "white",
+                cursor: canGoNext ? "pointer" : "default",
+                opacity: canGoNext ? 1 : 0.5,
+              }}
+            >
+              Далее
+            </button>
+          </div>
+        </aside>
 
-            <div className={styles.similarBlock}>
-              <div className={styles.similarTitle}>Похожие (ИИ)</div>
+        {confirmOpen && (
+          <div
+            className={styles.modalOverlay}
+            role="dialog"
+            aria-modal="true"
+            onClick={closeConfirm}
+          >
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.modalTitle}>Подтверждение</div>
+              <div className={styles.modalText}>{confirmText}</div>
 
-              {similarLoading ? (
-                <div className={styles.similarGrid}>
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className={styles.similarSkeleton} />
-                  ))}
-                </div>
-              ) : top4Similar.length === 0 ? (
-                <div className={styles.similarEmpty}>Похожих объявлений пока нет</div>
-              ) : (
-                <div className={styles.similarGrid}>
-                  {top4Similar.map((m) => {
-                    const img = resolveMediaUrl(m.item.image_url);
-                    const canOpen = m.item.status === "OPEN";
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.modalSecondary}
+                  onClick={closeConfirm}
+                >
+                  Отмена
+                </button>
 
-                    return (
-                      <button
-                        key={m.item.id}
-                        type="button"
-                        className={styles.similarCardBtn}
-                        onClick={canOpen ? () => askChatForSimilar(m) : undefined}
-                        disabled={!canOpen}
-                        title={!canOpen ? "Чат доступен только для OPEN" : undefined}
-                      >
-                        <div
-                          className={styles.similarImage}
-                          style={
-                            img
-                              ? {
-                                  backgroundImage: `url(${img})`,
-                                  backgroundSize: "contain",
-                                  backgroundRepeat: "no-repeat",
-                                  backgroundPosition: "center",
-                                }
-                              : undefined
-                          }
-                        />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                <button
+                  type="button"
+                  className={styles.modalPrimary}
+                  onClick={() => {
+                    pendingGo?.();
+                    closeConfirm();
+                  }}
+                  disabled={!pendingGo}
+                >
+                  Да
+                </button>
+              </div>
             </div>
           </div>
         )}
       </div>
-
-      <aside className={styles.aside}>
-        <Filters />
-
-        <div
-          style={{
-            marginTop: 10,
-            marginBottom: 10,
-            fontSize: 14,
-            opacity: 0.8,
-          }}
-        >
-          Показано: {items.length}
-          {typeof itemsTotal === "number" ? ` из ${itemsTotal}` : ""}
-        </div>
-
-        <div className={styles.items}>
-          {items.map((item) => (
-            <ItemCard
-              key={item.id}
-              title={item.title}
-              place={`${item.roomLabel}, ${item.floorLabel}`}
-              timeAgo={item.timeAgo}
-              status={item.status}
-              imageUrl={item.image_url}
-              onClick={() => setSelectedId(item.id)}
-              onDoubleClick={() => {
-                setSelectedId(item.id);
-                setDrawerOpen(true);
-              }}
-            />
-          ))}
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 10,
-            marginTop: 12,
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => updatePage(currentPage - 1)}
-            disabled={!canGoPrev}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "1px solid rgba(0,0,0,0.12)",
-              background: "white",
-              cursor: canGoPrev ? "pointer" : "default",
-              opacity: canGoPrev ? 1 : 0.5,
-            }}
-          >
-            Назад
-          </button>
-
-          <div style={{ fontSize: 14 }}>
-            Страница {currentPage}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => updatePage(currentPage + 1)}
-            disabled={!canGoNext}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "1px solid rgba(0,0,0,0.12)",
-              background: "white",
-              cursor: canGoNext ? "pointer" : "default",
-              opacity: canGoNext ? 1 : 0.5,
-            }}
-          >
-            Далее
-          </button>
-        </div>
-      </aside>
-
-      {confirmOpen && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeConfirm}
-        >
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalTitle}>Подтверждение</div>
-            <div className={styles.modalText}>{confirmText}</div>
-
-            <div className={styles.modalActions}>
-              <button
-                type="button"
-                className={styles.modalSecondary}
-                onClick={closeConfirm}
-              >
-                Отмена
-              </button>
-
-              <button
-                type="button"
-                className={styles.modalPrimary}
-                onClick={() => {
-                  pendingGo?.();
-                  closeConfirm();
-                }}
-                disabled={!pendingGo}
-              >
-                Да
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }

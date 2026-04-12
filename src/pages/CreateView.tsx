@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, ChangeEvent, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import Seo from "../components/Seo";
 import styles from "./CreateView.module.css";
 import { PREVIEW_MAP_COORDS, RoomId } from "../data/roomCoords";
 import type { MapItem, ItemCreatePayload, SimilarMatch } from "../api/items";
@@ -182,7 +183,6 @@ export default function CreateView({ onItemCreated }: Props) {
         description,
       };
 
-
       const created = await createItem(payload);
       const finalItem = imageFile ? await uploadItemImage(created.id, imageFile) : created;
 
@@ -261,250 +261,260 @@ export default function CreateView({ onItemCreated }: Props) {
     type === "lost" ? "Я потерял" : type === "found" ? "Я нашёл" : "Выберите тип";
 
   return (
-    <div className={styles.root}>
-      {/* Left column — form */}
-      <div className={styles.formCard}>
-        <div className={styles.title}>Создать пост</div>
+    <>
+      <Seo
+        title="Create Item - Campus Lost&Found"
+        description="Create a new lost or found item"
+        canonicalUrl={`${window.location.origin}/create`}
+        robots="noindex,nofollow"
+      />
 
-        <form className={styles.formBody} onSubmit={handleSubmit}>
-          {/* Lost / Found selection */}
-          <div className={styles.typeRow}>
-            <button
-              type="button"
-              className={type === "lost" ? styles.typePrimary : styles.typeSecondary}
-              onClick={() => void handleTypeClick("lost")}
-            >
-              Потерял
-            </button>
-            <button
-              type="button"
-              className={type === "found" ? styles.typePrimary : styles.typeSecondary}
-              onClick={() => void handleTypeClick("found")}
-            >
-              Нашёл
-            </button>
-          </div>
+      <div className={styles.root}>
+        {/* Left column — form */}
+        <div className={styles.formCard}>
+          <div className={styles.title}>Создать пост</div>
 
-          {/* Image upload */}
-          <label className={styles.dropzone}>
-            <span>{imageName ?? "Перетащи фото сюда или нажми, чтобы выбрать файл"}</span>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className={styles.fileInputHidden}
-            />
-          </label>
+          <form className={styles.formBody} onSubmit={handleSubmit}>
+            {/* Lost / Found selection */}
+            <div className={styles.typeRow}>
+              <button
+                type="button"
+                className={type === "lost" ? styles.typePrimary : styles.typeSecondary}
+                onClick={() => void handleTypeClick("lost")}
+              >
+                Потерял
+              </button>
+              <button
+                type="button"
+                className={type === "found" ? styles.typePrimary : styles.typeSecondary}
+                onClick={() => void handleTypeClick("found")}
+              >
+                Нашёл
+              </button>
+            </div>
 
-          {/* Title / description */}
-          <input
-            className={styles.input}
-            placeholder="Название"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <textarea
-            className={styles.textarea}
-            rows={4}
-            placeholder="Описание"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-
-          {/* Category, datetime, room */}
-          <div className={styles.metaGrid}>
-            <select
-              className={styles.metaControl}
-              value={category}
-              onChange={(e) => setCategory(e.target.value as CategoryType | "")}
-            >
-              <option value="" disabled>
-                Категория
-              </option>
-              <option value="electronics">Электроника</option>
-              <option value="clothes">Одежда</option>
-              <option value="personal">Личные вещи</option>
-              <option value="documents">Документы</option>
-            </select>
-
-            <input
-              className={styles.metaControl}
-              placeholder="Дата/время"
-              value={datetime}
-              onChange={(e) => setDatetime(e.target.value)}
-            />
-
-            <select
-              className={styles.metaControl}
-              value={room}
-              onChange={(e) => setRoom(e.target.value as RoomValue)}
-            >
-              <option value="">Место (аудитория)</option>
-              <option value="A-101">А-101 • 1 этаж</option>
-              <option value="A-120">А-120 • 1 этаж</option>
-              <option value="A-165">А-165 • 1 этаж</option>
-              <option value="A-170">А-170 • 1 этаж</option>
-            </select>
-          </div>
-
-          {error && <div className={styles.error}>{error}</div>}
-          {success && <div className={styles.success}>{success}</div>}
-
-          <button
-            type="submit"
-            className={styles.submitBtn}
-            disabled={isSubmitting || !imageFile}
-            title={!imageFile ? "Сначала прикрепите фото" : undefined}
-          >
-            {isSubmitting ? "Публикуем..." : "Опубликовать"}
-          </button>
-        </form>
-      </div>
-
-      {/* Right column — map + similar */}
-      <div className={styles.previewCard}>
-        <div className={styles.title}>{previewTitle} • Предпросмотр + Похожие (ИИ)</div>
-
-        <div className={styles.previewImage}>
-          <div className={styles.previewMapWrapper}>
-            <iframe
-              title="Карта МТУСИ, 1 этаж"
-              src="https://mtuci-map.vercel.app/"
-              className={styles.previewMapFrame}
-              loading="lazy"
-              style={{ pointerEvents: "none" }}
-            />
-            <div className={styles.previewCityBadge}>📍 Кампус МТУСИ • 1 этаж</div>
-
-            {coords && (
-              <div
-                className={`${styles.previewMarker} ${type === "found" ? styles.previewMarkerFound : styles.previewMarkerLost
-                  }`}
-                style={{ left: `${coords.x}%`, top: `${coords.y}%` }}
+            {/* Image upload */}
+            <label className={styles.dropzone}>
+              <span>{imageName ?? "Перетащи фото сюда или нажми, чтобы выбрать файл"}</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className={styles.fileInputHidden}
               />
-            )}
-          </div>
+            </label>
+
+            {/* Title / description */}
+            <input
+              className={styles.input}
+              placeholder="Название"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+            <textarea
+              className={styles.textarea}
+              rows={4}
+              placeholder="Описание"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+
+            {/* Category, datetime, room */}
+            <div className={styles.metaGrid}>
+              <select
+                className={styles.metaControl}
+                value={category}
+                onChange={(e) => setCategory(e.target.value as CategoryType | "")}
+              >
+                <option value="" disabled>
+                  Категория
+                </option>
+                <option value="electronics">Электроника</option>
+                <option value="clothes">Одежда</option>
+                <option value="personal">Личные вещи</option>
+                <option value="documents">Документы</option>
+              </select>
+
+              <input
+                className={styles.metaControl}
+                placeholder="Дата/время"
+                value={datetime}
+                onChange={(e) => setDatetime(e.target.value)}
+              />
+
+              <select
+                className={styles.metaControl}
+                value={room}
+                onChange={(e) => setRoom(e.target.value as RoomValue)}
+              >
+                <option value="">Место (аудитория)</option>
+                <option value="A-101">А-101 • 1 этаж</option>
+                <option value="A-120">А-120 • 1 этаж</option>
+                <option value="A-165">А-165 • 1 этаж</option>
+                <option value="A-170">А-170 • 1 этаж</option>
+              </select>
+            </div>
+
+            {error && <div className={styles.error}>{error}</div>}
+            {success && <div className={styles.success}>{success}</div>}
+
+            <button
+              type="submit"
+              className={styles.submitBtn}
+              disabled={isSubmitting || !imageFile}
+              title={!imageFile ? "Сначала прикрепите фото" : undefined}
+            >
+              {isSubmitting ? "Публикуем..." : "Опубликовать"}
+            </button>
+          </form>
         </div>
 
-        <div className={styles.previewGrid}>
-          {!imageFile ? (
-            <div className={styles.previewCaption}>
-              Выберите фото, чтобы искать похожие объявления.
-            </div>
-          ) : !type ? (
-            <div className={styles.previewCaption}>
-              Теперь выберите: Потерял или Нашёл — и мы покажем похожие (противоположного
-              типа).
-            </div>
-          ) : isSearching ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className={styles.previewItem}>
-                <div className={styles.previewThumb} />
-                <div className={styles.previewCaption}>Поиск...</div>
-              </div>
-            ))
-          ) : hasSearched && topSimilar.length === 0 ? (
-            <div className={styles.previewCaption}>
-              Похожих объявлений не найдено. Можно публиковать.
-            </div>
-          ) : (
-            topSimilar.map((m) => {
-              const img = resolveMediaUrl(m.item.image_url);
+        {/* Right column — map + similar */}
+        <div className={styles.previewCard}>
+          <div className={styles.title}>{previewTitle} • Предпросмотр + Похожие (ИИ)</div>
 
-              return (
+          <div className={styles.previewImage}>
+            <div className={styles.previewMapWrapper}>
+              <iframe
+                title="Карта МТУСИ, 1 этаж"
+                src="https://mtuci-map.vercel.app/"
+                className={styles.previewMapFrame}
+                loading="lazy"
+                style={{ pointerEvents: "none" }}
+              />
+              <div className={styles.previewCityBadge}>📍 Кампус МТУСИ • 1 этаж</div>
+
+              {coords && (
                 <div
-                  key={m.item.id}
-                  className={styles.previewItem}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() =>
-                    navigate(`/chat?itemId=${m.item.id}&ownerId=${m.item.owner_id}`, {
-                      state: {
-                        itemId: m.item.id,
-                        ownerId: m.item.owner_id,
-                        similarity: m.similarity,
-                      },
-                    })
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                  className={`${styles.previewMarker} ${
+                    type === "found" ? styles.previewMarkerFound : styles.previewMarkerLost
+                  }`}
+                  style={{ left: `${coords.x}%`, top: `${coords.y}%` }}
+                />
+              )}
+            </div>
+          </div>
+
+          <div className={styles.previewGrid}>
+            {!imageFile ? (
+              <div className={styles.previewCaption}>
+                Выберите фото, чтобы искать похожие объявления.
+              </div>
+            ) : !type ? (
+              <div className={styles.previewCaption}>
+                Теперь выберите: Потерял или Нашёл — и мы покажем похожие
+                (противоположного типа).
+              </div>
+            ) : isSearching ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className={styles.previewItem}>
+                  <div className={styles.previewThumb} />
+                  <div className={styles.previewCaption}>Поиск...</div>
+                </div>
+              ))
+            ) : hasSearched && topSimilar.length === 0 ? (
+              <div className={styles.previewCaption}>
+                Похожих объявлений не найдено. Можно публиковать.
+              </div>
+            ) : (
+              topSimilar.map((m) => {
+                const img = resolveMediaUrl(m.item.image_url);
+
+                return (
+                  <div
+                    key={m.item.id}
+                    className={styles.previewItem}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() =>
                       navigate(`/chat?itemId=${m.item.id}&ownerId=${m.item.owner_id}`, {
                         state: {
                           itemId: m.item.id,
                           ownerId: m.item.owner_id,
                           similarity: m.similarity,
                         },
-                      });
+                      })
                     }
-                  }}
-                >
-                  <div className={styles.previewThumb}>
-                    {img ? (
-                      <img
-                        src={img}
-                        alt={m.item.title}
-                        loading="lazy"
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "contain",
-                          display: "block",
-                        }}
-                      />
-                    ) : null}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        navigate(`/chat?itemId=${m.item.id}&ownerId=${m.item.owner_id}`, {
+                          state: {
+                            itemId: m.item.id,
+                            ownerId: m.item.owner_id,
+                            similarity: m.similarity,
+                          },
+                        });
+                      }
+                    }}
+                  >
+                    <div className={styles.previewThumb}>
+                      {img ? (
+                        <img
+                          src={img}
+                          alt={m.item.title}
+                          loading="lazy"
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                            display: "block",
+                          }}
+                        />
+                      ) : null}
+                    </div>
+
+                    <div className={styles.previewCaption}>
+                      {m.item.title} • {Math.round(m.similarity * 100)}%
+                    </div>
                   </div>
-
-                  <div className={styles.previewCaption}>
-                    {m.item.title} • {Math.round(m.similarity * 100)}%
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* Confirmation modal */}
-      {confirmOpen && (
-        <div
-          className={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          onClick={closeConfirm}
-        >
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalTitle}>Подтверждение</div>
-
-            <div className={styles.modalText}>
-              {(confirmText ?? "").split("\n").map((line, i) => (
-                <div key={i}>{line}</div>
-              ))}
-            </div>
-
-            <div className={styles.modalActions}>
-              <button
-                type="button"
-                className={styles.modalSecondary}
-                onClick={closeConfirm}
-                disabled={isSubmitting}
-              >
-                Отмена
-              </button>
-
-              <button
-                type="button"
-                className={styles.modalPrimary}
-                onClick={() => {
-                  void pendingPublish?.();
-                }}
-                disabled={!pendingPublish || isSubmitting}
-              >
-                Опубликовать всё равно
-              </button>
-            </div>
+                );
+              })
+            )}
           </div>
         </div>
-      )}
-    </div>
+
+        {/* Confirmation modal */}
+        {confirmOpen && (
+          <div
+            className={styles.modalOverlay}
+            role="dialog"
+            aria-modal="true"
+            onClick={closeConfirm}
+          >
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.modalTitle}>Подтверждение</div>
+
+              <div className={styles.modalText}>
+                {(confirmText ?? "").split("\n").map((line, i) => (
+                  <div key={i}>{line}</div>
+                ))}
+              </div>
+
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.modalSecondary}
+                  onClick={closeConfirm}
+                  disabled={isSubmitting}
+                >
+                  Отмена
+                </button>
+
+                <button
+                  type="button"
+                  className={styles.modalPrimary}
+                  onClick={() => {
+                    void pendingPublish?.();
+                  }}
+                  disabled={!pendingPublish || isSubmitting}
+                >
+                  Опубликовать всё равно
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

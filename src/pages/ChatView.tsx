@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { io, type Socket } from "socket.io-client";
+import Seo from "../components/Seo";
 import styles from "./ChatView.module.css";
 import { api } from "../api/client";
 
@@ -189,7 +190,7 @@ export default function ChatView() {
     if (socketRef.current) {
       try {
         socketRef.current.disconnect();
-      } catch { }
+      } catch {}
       socketRef.current = null;
     }
 
@@ -249,7 +250,7 @@ export default function ChatView() {
     return () => {
       try {
         s.disconnect();
-      } catch { }
+      } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId]);
@@ -334,311 +335,336 @@ export default function ChatView() {
   // UI состояния
   if (meLoading) {
     return (
-      <div className={styles.root}>
-        <div style={{ padding: 16 }}>Загрузка профиля...</div>
-      </div>
+      <>
+        <Seo
+          title="Chat - Campus Lost&Found"
+          description="Private chat in Campus Lost&Found"
+          canonicalUrl={`${window.location.origin}/chat`}
+          robots="noindex,nofollow"
+        />
+        <div className={styles.root}>
+          <div style={{ padding: 16 }}>Загрузка профиля...</div>
+        </div>
+      </>
     );
   }
 
   if (meError) {
     return (
-      <div className={styles.root}>
-        <div style={{ padding: 16 }}>
-          <div style={{ marginBottom: 12 }}>{meError}</div>
-          <button onClick={() => navigate("/login")}>Перейти к входу</button>
+      <>
+        <Seo
+          title="Chat - Campus Lost&Found"
+          description="Private chat in Campus Lost&Found"
+          canonicalUrl={`${window.location.origin}/chat`}
+          robots="noindex,nofollow"
+        />
+        <div className={styles.root}>
+          <div style={{ padding: 16 }}>
+            <div style={{ marginBottom: 12 }}>{meError}</div>
+            <button onClick={() => navigate("/login")}>Перейти к входу</button>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className={styles.root}>
-      <aside className={styles.sidebar}>
-        <div className={styles.sidebarTitle}>Диалоги</div>
+    <>
+      <Seo
+        title="Chat - Campus Lost&Found"
+        description="Private chat in Campus Lost&Found"
+        canonicalUrl={`${window.location.origin}/chat`}
+        robots="noindex,nofollow"
+      />
 
-        {threadsLoading ? (
-          <div style={{ padding: 12, opacity: 0.7 }}>Загрузка...</div>
-        ) : threads.length === 0 ? (
-          <div style={{ padding: 12, opacity: 0.7 }}>
-            Пока нет диалогов. Открой чат из карточки объявления.
-          </div>
-        ) : (
-          threads.map((t) => {
-            const isActive = t.id === activeThreadId;
-            return (
-              <div
-                key={t.id}
-                className={styles.dialogItem}
-                style={{ cursor: "pointer", opacity: isActive ? 1 : 0.9 }}
-                onClick={() => {
-                  setActiveThreadId(t.id);
-                  setActiveItemId(t.item_id);
-                  setActivePeerId(t.peer_id);
-                  setMessages([]);
-                  navigate(`/chat?threadId=${t.id}`, { replace: true });
-                }}
-              >
-                <div className={styles.dialogTitle}>
-                  {t.item_title ?? `Item #${t.item_id}`}
-                </div>
-                <div className={styles.dialogMeta}>
-                  {t.item_status ? `${t.item_status} • ` : ""}
-                  peer: {t.peer_id}
-                  {t.last_message_text ? ` • ${t.last_message_text}` : ""}
-                </div>
-              </div>
-            );
-          })
-        )}
-      </aside>
+      <div className={styles.root}>
+        <aside className={styles.sidebar}>
+          <div className={styles.sidebarTitle}>Диалоги</div>
 
-      <div className={styles.chatColumn}>
-        <div className={styles.chatHeader}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              width: "100%",
-              gap: 12,
-            }}
-          >
-            <div>
-              <div className={styles.chatTitle}>{activeTitle}</div>
-
-              {activeThreadId ? (
-                <div className={styles.chatMeta}>
-                  {activeMeta}
-
-                  {!isClosed && (iRequestedClose || peerRequestedClose) ? (
-                    <span style={{ marginLeft: 10, opacity: 0.8 }}>
-                      {iRequestedClose && !peerRequestedClose
-                        ? "Вы подтвердили завершение • ждём второго участника"
-                        : !iRequestedClose && peerRequestedClose
-                          ? "Второй участник хочет завершить чат"
-                          : iRequestedClose && peerRequestedClose
-                            ? "Оба подтвердили завершение"
-                            : null}
-                    </span>
-                  ) : null}
-                </div>
-              ) : (
-                <div className={styles.chatMeta} style={{ opacity: 0.7 }}>
-                  Выбери диалог слева
-                </div>
-              )}
+          {threadsLoading ? (
+            <div style={{ padding: 12, opacity: 0.7 }}>Загрузка...</div>
+          ) : threads.length === 0 ? (
+            <div style={{ padding: 12, opacity: 0.7 }}>
+              Пока нет диалогов. Открой чат из карточки объявления.
             </div>
-
-            {activeThreadId && !isClosed ? (
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <button
-                  type="button"
-                  className={styles.reportBtn}
-                  onClick={() => {
-                    setReportMsg(null);
-                    setReportOpen(true);
-                  }}
-                  disabled={reportLoading}
-                >
-                  Пожаловаться
-                </button>
-
-                {!iRequestedClose ? (
-                  <button
-                    type="button"
-                    className={styles.closeChatBtn}
-                    onClick={() => setCloseConfirmOpen(true)}
-                    disabled={closeLoading}
-                  >
-                    Завершить чат
-                  </button>
-                ) : (
-                  <button type="button" disabled style={{ opacity: 0.7 }}>
-                    Ожидаем второго участника…
-                  </button>
-                )}
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div className={styles.messages}>
-          {!activeThreadId ? (
-            <div style={{ opacity: 0.7 }}>Нет активного диалога.</div>
-          ) : messages.length === 0 ? (
-            <div style={{ opacity: 0.7 }}>Сообщений пока нет. Напиши первым 🙂</div>
           ) : (
-            messages.map((m, idx) => {
-              const outgoing = m.senderId === meId;
+            threads.map((t) => {
+              const isActive = t.id === activeThreadId;
               return (
                 <div
-                  key={m.clientId ?? idx}
-                  className={outgoing ? styles.messageOutgoing : styles.messageIncoming}
+                  key={t.id}
+                  className={styles.dialogItem}
+                  style={{ cursor: "pointer", opacity: isActive ? 1 : 0.9 }}
+                  onClick={() => {
+                    setActiveThreadId(t.id);
+                    setActiveItemId(t.item_id);
+                    setActivePeerId(t.peer_id);
+                    setMessages([]);
+                    navigate(`/chat?threadId=${t.id}`, { replace: true });
+                  }}
                 >
-                  {m.text}
+                  <div className={styles.dialogTitle}>
+                    {t.item_title ?? `Item #${t.item_id}`}
+                  </div>
+                  <div className={styles.dialogMeta}>
+                    {t.item_status ? `${t.item_status} • ` : ""}
+                    peer: {t.peer_id}
+                    {t.last_message_text ? ` • ${t.last_message_text}` : ""}
+                  </div>
                 </div>
               );
             })
           )}
-        </div>
+        </aside>
 
-        {/* ✅ низ: если CLOSED — блок отправки НЕ рисуем */}
-        {isClosed ? (
-          <div
-            className={styles.inputRow}
-            style={{ opacity: 0.7, justifyContent: "center" }}
-          >
-            Чат закрыт
-          </div>
-        ) : (
-          <div className={styles.inputRow}>
-            <input
-              className={styles.input}
-              placeholder={
-                !activeThreadId
-                  ? "Выберите диалог слева"
-                  : iRequestedClose
-                    ? "Вы подтвердили завершение — ждём второго участника"
-                    : "Написать сообщение"
-              }
-              value={text}
-              disabled={!activeThreadId || iRequestedClose}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") send();
+        <div className={styles.chatColumn}>
+          <div className={styles.chatHeader}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                width: "100%",
+                gap: 12,
               }}
-            />
-            <button
-              className={styles.sendBtn}
-              onClick={send}
-              disabled={!activeThreadId || iRequestedClose}
             >
-              Отправить
-            </button>
-          </div>
-        )}
+              <div>
+                <div className={styles.chatTitle}>{activeTitle}</div>
 
-        {/* ✅ модалка подтверждения */}
-        {closeConfirmOpen && (
-          <div
-            className={styles.modalOverlay}
-            role="dialog"
-            aria-modal="true"
-            onClick={() => setCloseConfirmOpen(false)}
-          >
-            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-              <div className={styles.modalTitle}>Подтверждение</div>
-              <div className={styles.modalText}>
-                Уверены, что хотите завершить чат?
-                <br />
-                Чат станет CLOSED только когда оба участника подтвердят завершение.
-                <br />
-                После вашего подтверждения вы не сможете писать, пока второй не подтвердит.
-              </div>
+                {activeThreadId ? (
+                  <div className={styles.chatMeta}>
+                    {activeMeta}
 
-              <div className={styles.modalActions}>
-                <button
-                  type="button"
-                  className={styles.modalSecondary}
-                  onClick={() => setCloseConfirmOpen(false)}
-                  disabled={closeLoading}
-                >
-                  Отмена
-                </button>
-
-                <button
-                  type="button"
-                  className={styles.modalPrimary}
-                  onClick={() => void closeActiveThread()}
-                  disabled={closeLoading}
-                >
-                  Да, завершить
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {reportOpen && (
-          <div
-            className={styles.modalOverlay}
-            role="dialog"
-            aria-modal="true"
-            onClick={() => setReportOpen(false)}
-          >
-            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-              <div className={styles.modalTitle}>Пожаловаться</div>
-              <div className={styles.modalText}>Выберите причину жалобы:</div>
-
-              <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-                <label>
-                  <input
-                    type="radio"
-                    name="reason"
-                    checked={reportReason === "scam"}
-                    onChange={() => setReportReason("scam")}
-                  />{" "}
-                  Мошенничество
-                </label>
-
-                <label>
-                  <input
-                    type="radio"
-                    name="reason"
-                    checked={reportReason === "false_connection"}
-                    onChange={() => setReportReason("false_connection")}
-                  />{" "}
-                  Ложное соединение
-                </label>
-
-                <label>
-                  <input
-                    type="radio"
-                    name="reason"
-                    checked={reportReason === "other"}
-                    onChange={() => setReportReason("other")}
-                  />{" "}
-                  Другое
-                </label>
-
-                {reportReason === "other" && (
-                  <textarea
-                    value={reportDetails}
-                    onChange={(e) => setReportDetails(e.target.value)}
-                    placeholder="Опишите причину..."
-                    style={{ width: "100%", minHeight: 80, padding: 8 }}
-                  />
+                    {!isClosed && (iRequestedClose || peerRequestedClose) ? (
+                      <span style={{ marginLeft: 10, opacity: 0.8 }}>
+                        {iRequestedClose && !peerRequestedClose
+                          ? "Вы подтвердили завершение • ждём второго участника"
+                          : !iRequestedClose && peerRequestedClose
+                            ? "Второй участник хочет завершить чат"
+                            : iRequestedClose && peerRequestedClose
+                              ? "Оба подтвердили завершение"
+                              : null}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className={styles.chatMeta} style={{ opacity: 0.7 }}>
+                    Выбери диалог слева
+                  </div>
                 )}
-
-                {reportMsg && <div style={{ color: "crimson" }}>{reportMsg}</div>}
               </div>
 
-              <div className={styles.modalActions}>
-                <button
-                  type="button"
-                  className={styles.modalSecondary}
-                  onClick={() => setReportOpen(false)}
-                  disabled={reportLoading}
-                >
-                  Отмена
-                </button>
+              {activeThreadId && !isClosed ? (
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className={styles.reportBtn}
+                    onClick={() => {
+                      setReportMsg(null);
+                      setReportOpen(true);
+                    }}
+                    disabled={reportLoading}
+                  >
+                    Пожаловаться
+                  </button>
 
-                <button
-                  type="button"
-                  className={styles.modalPrimary}
-                  onClick={() => void submitReport()}
-                  disabled={
-                    reportLoading ||
-                    (reportReason === "other" && !reportDetails.trim())
-                  }
-                >
-                  Отправить
-                </button>
-              </div>
+                  {!iRequestedClose ? (
+                    <button
+                      type="button"
+                      className={styles.closeChatBtn}
+                      onClick={() => setCloseConfirmOpen(true)}
+                      disabled={closeLoading}
+                    >
+                      Завершить чат
+                    </button>
+                  ) : (
+                    <button type="button" disabled style={{ opacity: 0.7 }}>
+                      Ожидаем второго участника…
+                    </button>
+                  )}
+                </div>
+              ) : null}
             </div>
           </div>
-        )}
+
+          <div className={styles.messages}>
+            {!activeThreadId ? (
+              <div style={{ opacity: 0.7 }}>Нет активного диалога.</div>
+            ) : messages.length === 0 ? (
+              <div style={{ opacity: 0.7 }}>Сообщений пока нет. Напиши первым 🙂</div>
+            ) : (
+              messages.map((m, idx) => {
+                const outgoing = m.senderId === meId;
+                return (
+                  <div
+                    key={m.clientId ?? idx}
+                    className={outgoing ? styles.messageOutgoing : styles.messageIncoming}
+                  >
+                    {m.text}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* ✅ низ: если CLOSED — блок отправки НЕ рисуем */}
+          {isClosed ? (
+            <div
+              className={styles.inputRow}
+              style={{ opacity: 0.7, justifyContent: "center" }}
+            >
+              Чат закрыт
+            </div>
+          ) : (
+            <div className={styles.inputRow}>
+              <input
+                className={styles.input}
+                placeholder={
+                  !activeThreadId
+                    ? "Выберите диалог слева"
+                    : iRequestedClose
+                      ? "Вы подтвердили завершение — ждём второго участника"
+                      : "Написать сообщение"
+                }
+                value={text}
+                disabled={!activeThreadId || iRequestedClose}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") send();
+                }}
+              />
+              <button
+                className={styles.sendBtn}
+                onClick={send}
+                disabled={!activeThreadId || iRequestedClose}
+              >
+                Отправить
+              </button>
+            </div>
+          )}
+
+          {/* ✅ модалка подтверждения */}
+          {closeConfirmOpen && (
+            <div
+              className={styles.modalOverlay}
+              role="dialog"
+              aria-modal="true"
+              onClick={() => setCloseConfirmOpen(false)}
+            >
+              <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+                <div className={styles.modalTitle}>Подтверждение</div>
+                <div className={styles.modalText}>
+                  Уверены, что хотите завершить чат?
+                  <br />
+                  Чат станет CLOSED только когда оба участника подтвердят завершение.
+                  <br />
+                  После вашего подтверждения вы не сможете писать, пока второй не подтвердит.
+                </div>
+
+                <div className={styles.modalActions}>
+                  <button
+                    type="button"
+                    className={styles.modalSecondary}
+                    onClick={() => setCloseConfirmOpen(false)}
+                    disabled={closeLoading}
+                  >
+                    Отмена
+                  </button>
+
+                  <button
+                    type="button"
+                    className={styles.modalPrimary}
+                    onClick={() => void closeActiveThread()}
+                    disabled={closeLoading}
+                  >
+                    Да, завершить
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {reportOpen && (
+            <div
+              className={styles.modalOverlay}
+              role="dialog"
+              aria-modal="true"
+              onClick={() => setReportOpen(false)}
+            >
+              <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+                <div className={styles.modalTitle}>Пожаловаться</div>
+                <div className={styles.modalText}>Выберите причину жалобы:</div>
+
+                <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+                  <label>
+                    <input
+                      type="radio"
+                      name="reason"
+                      checked={reportReason === "scam"}
+                      onChange={() => setReportReason("scam")}
+                    />{" "}
+                    Мошенничество
+                  </label>
+
+                  <label>
+                    <input
+                      type="radio"
+                      name="reason"
+                      checked={reportReason === "false_connection"}
+                      onChange={() => setReportReason("false_connection")}
+                    />{" "}
+                    Ложное соединение
+                  </label>
+
+                  <label>
+                    <input
+                      type="radio"
+                      name="reason"
+                      checked={reportReason === "other"}
+                      onChange={() => setReportReason("other")}
+                    />{" "}
+                    Другое
+                  </label>
+
+                  {reportReason === "other" && (
+                    <textarea
+                      value={reportDetails}
+                      onChange={(e) => setReportDetails(e.target.value)}
+                      placeholder="Опишите причину..."
+                      style={{ width: "100%", minHeight: 80, padding: 8 }}
+                    />
+                  )}
+
+                  {reportMsg && <div style={{ color: "crimson" }}>{reportMsg}</div>}
+                </div>
+
+                <div className={styles.modalActions}>
+                  <button
+                    type="button"
+                    className={styles.modalSecondary}
+                    onClick={() => setReportOpen(false)}
+                    disabled={reportLoading}
+                  >
+                    Отмена
+                  </button>
+
+                  <button
+                    type="button"
+                    className={styles.modalPrimary}
+                    onClick={() => void submitReport()}
+                    disabled={
+                      reportLoading ||
+                      (reportReason === "other" && !reportDetails.trim())
+                    }
+                  >
+                    Отправить
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

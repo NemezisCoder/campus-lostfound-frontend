@@ -5,6 +5,7 @@ import OrDivider from "./OrDivider";
 import OauthButtons from "./OauthButtons";
 import styles from "./LoginView.module.css";
 import { login } from "../../api/auth";
+import Seo from "../../components/Seo";
 
 export default function LoginView({
   onSignIn,
@@ -34,43 +35,51 @@ export default function LoginView({
   }
 
   return (
-    <AuthCard title="Welcome Back" subtitle="Sign in to continue to Campus Lost&Found">
-      <div className={styles.root}>
-        <Input
-          placeholder="Email"
-          type="email"
-          value={email}
-          onChange={(e: any) => setEmail(e.target.value)}
-        />
-        <Input
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(e: any) => setPassword(e.target.value)}
-        />
+    <>
+      <Seo
+        title="Login - Campus Lost&Found"
+        description="Sign in to your Campus Lost&Found account"
+        canonicalUrl={`${window.location.origin}/login`}
+        robots="noindex,nofollow"
+      />
 
-        {err && <div style={{ color: "crimson", fontSize: 14 }}>{err}</div>}
+      <AuthCard title="Welcome Back" subtitle="Sign in to continue to Campus Lost&Found">
+        <div className={styles.root}>
+          <Input
+            placeholder="Email"
+            type="email"
+            value={email}
+            onChange={(e: any) => setEmail(e.target.value)}
+          />
+          <Input
+            placeholder="Password"
+            type="password"
+            value={password}
+            onChange={(e: any) => setPassword(e.target.value)}
+          />
 
-        <div className={styles.forgotRow}>
-          <button className={styles.forgotBtn} onClick={onForgot}>
-            Forgot Password?
+          {err && <div style={{ color: "crimson", fontSize: 14 }}>{err}</div>}
+
+          <div className={styles.forgotRow}>
+            <button className={styles.forgotBtn} onClick={onForgot}>
+              Forgot Password?
+            </button>
+          </div>
+
+          <button onClick={handleSignIn} className={styles.signInBtn} disabled={loading}>
+            {loading ? "Signing In..." : "Sign In"}
           </button>
+
+          <OrDivider />
+
+          <div className={styles.bottomText}>
+            Don't have an account?
+            <button className={styles.linkBtn} onClick={onGoSignUp}>
+              Sign Up
+            </button>
+          </div>
         </div>
-
-        <button onClick={handleSignIn} className={styles.signInBtn} disabled={loading}>
-          {loading ? "Signing In..." : "Sign In"}
-        </button>
-
-        <OrDivider />
-
-
-        <div className={styles.bottomText}>
-          Don't have an account?
-          <button className={styles.linkBtn} onClick={onGoSignUp}>
-            Sign Up
-          </button>
-        </div>
-      </div>
-    </AuthCard>
+      </AuthCard>
+    </>
   );
 }

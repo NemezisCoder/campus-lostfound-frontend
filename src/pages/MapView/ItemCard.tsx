@@ -33,22 +33,24 @@ export default function ItemCard({
 
   return (
     <div className={styles.card} onClick={onClick} onDoubleClick={onDoubleClick}>
-      <div
-        className={styles.image}
-        style={
-          img
-            ? {
-              backgroundImage: `url(${img})`,
-              backgroundSize: "contain",
-              backgroundRepeat: "no-repeat",
-              backgroundPosition: "center",
-            }
-            : undefined
-        }
-      />
+      <div className={styles.image}>
+        {img ? (
+          <img
+            src={img}
+            alt={title}
+            className={styles.imageTag}
+            loading="lazy"
+          />
+        ) : (
+          <div className={styles.imagePlaceholder} aria-hidden="true">
+            Нет фото
+          </div>
+        )}
+      </div>
+
       <div className={styles.body}>
         <div className={styles.header}>
-          <div className={styles.title}>{title}</div>
+          <h3 className={styles.title}>{title}</h3>
 
           <span className={`${styles.statusChip} ${statusClass}`}>{status}</span>
         </div>
