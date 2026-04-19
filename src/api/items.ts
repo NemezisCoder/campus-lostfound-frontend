@@ -1,5 +1,8 @@
+import axios from "axios";
 import { RoomId } from "../data/roomCoords";
 import { api } from "./client";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 export type ItemType = "lost" | "found";
 export type StatusType = "OPEN" | "IN_PROGRESS" | "CLOSED";
@@ -55,15 +58,31 @@ export async function createItem(payload: ItemCreatePayload): Promise<MapItem> {
   return res.data;
 }
 
-export async function uploadItemImage(itemId: number, file: File): Promise<MapItem> {
-  const form = new FormData();
-  form.append("file", file);
+export async function uploadItemImage(
+  itemId: number,
+  file: File,
+  token: string,
+  onProgress?: (percent: number) => void,
+): Promise<MapItem> {
+  const formData = new FormData();
+  formData.append("file", file);
 
-  const res = await api.post<MapItem>(`/items/${itemId}/image`, form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const response = await axios.post<MapItem>(
+    `${API_URL}/items/${itemId}/image`,
+    formData,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      onUploadProgress: (event) => {
+        if (!event.total) return;
+        const percent = Math.round((event.loaded * 100) / event.total);
+        onProgress?.(percent);
+      },
+    }
+  );
 
-  return res.data;
+  return response.data;
 }
 
 export type SimilarMatch = { item: MapItem; similarity: number };

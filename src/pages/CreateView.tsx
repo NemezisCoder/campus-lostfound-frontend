@@ -28,10 +28,26 @@ type Props = {
   onItemCreated: (item: MapItem) => void;
 };
 
+function getAccessToken(): string | null {
+  const candidates = [
+    localStorage.getItem("access_token"),
+    localStorage.getItem("token"),
+    localStorage.getItem("authToken"),
+    sessionStorage.getItem("access_token"),
+    sessionStorage.getItem("token"),
+    sessionStorage.getItem("authToken"),
+  ];
+
+  for (const value of candidates) {
+    if (value && value.trim()) return value;
+  }
+
+  return null;
+}
+
 export default function CreateView({ onItemCreated }: Props) {
   const navigate = useNavigate();
 
-  // No default selection: user must choose lost/found explicitly.
   const [type, setType] = useState<ItemType | null>(null);
 
   const [room, setRoom] = useState<RoomValue>("");
@@ -48,43 +64,34 @@ export default function CreateView({ onItemCreated }: Props) {
   const [datetime, setDatetime] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Confirmation modal state (no window.confirm).
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmText, setConfirmText] = useState<string | null>(null);
-  const [pendingPublish, setPendingPublish] = useState<(() => Promise<void>) | null>(
-    null,
-  );
+  const [pendingPublish, setPendingPublish] = useState<(() => Promise<void>) | null>(null);
 
   const coords = useMemo(() => {
     return room ? PREVIEW_MAP_COORDS[room] : undefined;
   }, [room]);
 
-  // ✅ take top-3 by similarity (desc)
   const topSimilar = useMemo(() => {
     return [...similar].sort((a, b) => b.similarity - a.similarity).slice(0, 3);
   }, [similar]);
 
-  // Helper: returns opposite type for matching.
-  const getTargetType = (t: ItemType) => (t === "lost" ? "found" : "lost");
-
-  // Helper: open modal and store continuation.
   function openConfirm(message: string, onConfirm: () => Promise<void>) {
     setConfirmText(message);
     setPendingPublish(() => onConfirm);
     setConfirmOpen(true);
   }
 
-  // Helper: close modal and drop continuation.
   function closeConfirm() {
     setConfirmOpen(false);
     setConfirmText(null);
     setPendingPublish(null);
   }
 
-  // UX: allow closing modal with Escape.
   useEffect(() => {
     if (!confirmOpen) return;
 
@@ -96,7 +103,6 @@ export default function CreateView({ onItemCreated }: Props) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [confirmOpen]);
 
-  // Helper: run similarity search only when we have BOTH file + type.
   async function runSimilarSearch(selectedType: ItemType, file: File) {
     setIsSearching(true);
     setHasSearched(true);
@@ -105,14 +111,12 @@ export default function CreateView({ onItemCreated }: Props) {
     try {
       const raw = await searchSimilarByImage(file, 8);
 
-      // Show only opposite type matches (lost -> found, found -> lost).
+      const filtered = raw;
+      console.log("raw", raw, "selectedType", selectedType);
 
-      const filtered = raw; // временно для проверки
-      console.log("raw", raw);
       setSimilar(filtered);
       return filtered;
     } catch (err: any) {
-      // If backend requires auth, we surface a friendly message.
       const status = err?.response?.status;
       if (status === 401) {
         setError("Войдите в аккаунт, чтобы видеть похожие объявления.");
@@ -129,9 +133,8 @@ export default function CreateView({ onItemCreated }: Props) {
 
     setImageName(file ? file.name : null);
     setImageFile(file);
+    setUploadProgress(0);
 
-    // Do NOT auto-search on file selection.
-    // Search should happen only after user selects lost/found.
     setSimilar([]);
     setHasSearched(false);
     setSuccess(null);
@@ -143,23 +146,20 @@ export default function CreateView({ onItemCreated }: Props) {
     setSuccess(null);
     setError(null);
 
-    // If user already picked a file, run search now.
     if (imageFile) {
       await runSimilarSearch(nextType, imageFile);
     } else {
-      // No file -> no results.
       setSimilar([]);
       setHasSearched(false);
     }
   };
 
-  // Anti-duplicate rule (MVP):
-  // If there is a very similar ACTIVE item (status != CLOSED), ask user via modal.
   const DUPLICATE_THRESHOLD = 0.9;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSuccess(null);
+
     if (!imageFile) return setError("Прикрепите фото, чтобы опубликовать пост");
     if (!type) return setError("Выберите: Потерял или Нашёл");
     if (!title.trim()) return setError("Введите название");
@@ -168,6 +168,7 @@ export default function CreateView({ onItemCreated }: Props) {
 
     setError(null);
     setIsSubmitting(true);
+    setUploadProgress(0);
 
     const doPublish = async () => {
       const meta = ROOM_META[room as RoomId];
@@ -184,13 +185,23 @@ export default function CreateView({ onItemCreated }: Props) {
       };
 
       const created = await createItem(payload);
-      const finalItem = imageFile ? await uploadItemImage(created.id, imageFile) : created;
+
+      let finalItem = created;
+
+      if (imageFile) {
+        const token = getAccessToken();
+
+        if (!token) {
+          throw new Error("Не найден токен авторизации. Войдите в аккаунт снова.");
+        }
+
+        finalItem = await uploadItemImage(created.id, imageFile, token, setUploadProgress);
+      }
 
       onItemCreated(finalItem);
 
       setSuccess("Пост опубликован ✅");
 
-      // Reset form.
       setTitle("");
       setDescription("");
       setCategory("");
@@ -201,22 +212,20 @@ export default function CreateView({ onItemCreated }: Props) {
       setSimilar([]);
       setHasSearched(false);
       setType(null);
+      setUploadProgress(0);
     };
 
     try {
-      // If we have an image, check duplicates BEFORE publishing.
       if (imageFile) {
         const matches = hasSearched ? similar : await runSimilarSearch(type, imageFile);
 
         const strongDuplicate = matches.find(
           (m) =>
             m.similarity >= DUPLICATE_THRESHOLD &&
-            // Treat missing status as active (safety).
             (m.item.status ?? "OPEN") !== "CLOSED",
         );
 
         if (strongDuplicate) {
-          // Stop submit spinner and ask user via modal.
           setIsSubmitting(false);
 
           openConfirm(
@@ -245,7 +254,6 @@ export default function CreateView({ onItemCreated }: Props) {
         }
       }
 
-      // No strong duplicates -> publish immediately.
       await doPublish();
     } catch (err: any) {
       console.error(err);
@@ -270,12 +278,10 @@ export default function CreateView({ onItemCreated }: Props) {
       />
 
       <div className={styles.root}>
-        {/* Left column — form */}
         <div className={styles.formCard}>
           <div className={styles.title}>Создать пост</div>
 
           <form className={styles.formBody} onSubmit={handleSubmit}>
-            {/* Lost / Found selection */}
             <div className={styles.typeRow}>
               <button
                 type="button"
@@ -293,7 +299,6 @@ export default function CreateView({ onItemCreated }: Props) {
               </button>
             </div>
 
-            {/* Image upload */}
             <label className={styles.dropzone}>
               <span>{imageName ?? "Перетащи фото сюда или нажми, чтобы выбрать файл"}</span>
               <input
@@ -304,7 +309,6 @@ export default function CreateView({ onItemCreated }: Props) {
               />
             </label>
 
-            {/* Title / description */}
             <input
               className={styles.input}
               placeholder="Название"
@@ -319,7 +323,6 @@ export default function CreateView({ onItemCreated }: Props) {
               onChange={(e) => setDescription(e.target.value)}
             />
 
-            {/* Category, datetime, room */}
             <div className={styles.metaGrid}>
               <select
                 className={styles.metaControl}
@@ -355,6 +358,10 @@ export default function CreateView({ onItemCreated }: Props) {
               </select>
             </div>
 
+            {uploadProgress > 0 && uploadProgress < 100 && (
+              <div className={styles.previewCaption}>Загрузка изображения: {uploadProgress}%</div>
+            )}
+
             {error && <div className={styles.error}>{error}</div>}
             {success && <div className={styles.success}>{success}</div>}
 
@@ -369,7 +376,6 @@ export default function CreateView({ onItemCreated }: Props) {
           </form>
         </div>
 
-        {/* Right column — map + similar */}
         <div className={styles.previewCard}>
           <div className={styles.title}>{previewTitle} • Предпросмотр + Похожие (ИИ)</div>
 
@@ -473,7 +479,6 @@ export default function CreateView({ onItemCreated }: Props) {
           </div>
         </div>
 
-        {/* Confirmation modal */}
         {confirmOpen && (
           <div
             className={styles.modalOverlay}
