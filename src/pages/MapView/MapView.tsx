@@ -9,11 +9,34 @@ import { resolveMediaUrl } from "../../api/media";
 import { deduplicateItem } from "../../api/items";
 import { fetchMe } from "../../api/auth";
 import Seo from "../../components/Seo";
+import WeatherWidget from "../../components/WeatherWidget";
+
+type MapViewProps = {
+  drawerOpen: boolean;
+  setDrawerOpen: (value: boolean) => void;
+  items: MapItem[];
+  itemsTotal?: number;
+  itemsPage?: number;
+  itemsPageSize?: number;
+};
 
 function parsePositiveInt(value: string | null, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) return fallback;
   return parsed;
+}
+
+function getReadableStatus(status: MapItem["status"]): string {
+  switch (status) {
+    case "OPEN":
+      return "Открыто";
+    case "IN_PROGRESS":
+      return "В обработке";
+    case "CLOSED":
+      return "Закрыто";
+    default:
+      return status;
+  }
 }
 
 export default function MapView({
@@ -23,22 +46,24 @@ export default function MapView({
   itemsTotal,
   itemsPage,
   itemsPageSize,
-}: {
-  drawerOpen: boolean;
-  setDrawerOpen: (b: boolean) => void;
-  items: MapItem[];
-  itemsTotal?: number;
-  itemsPage?: number;
-  itemsPageSize?: number;
-}) {
+}: MapViewProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const currentPage = itemsPage ?? parsePositiveInt(searchParams.get("page"), 1);
-  const currentPageSize = itemsPageSize ?? parsePositiveInt(searchParams.get("page_size"), 20);
+  const currentPageSize =
+    itemsPageSize ?? parsePositiveInt(searchParams.get("page_size"), 20);
   const totalItems = itemsTotal ?? items.length;
 
   const [selectedId, setSelectedId] = useState<number | null>(items[0]?.id ?? null);
+  const [similarCandidates, setSimilarCandidates] = useState<SimilarMatch[]>([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [pendingGo, setPendingGo] = useState<null | (() => void)>(null);
+
+  const [meId, setMeId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!items.length) {
@@ -51,42 +76,10 @@ export default function MapView({
       return;
     }
 
-    if (!items.some((x) => x.id === selectedId)) {
+    if (!items.some((item) => item.id === selectedId)) {
       setSelectedId(items[0].id);
     }
   }, [items, selectedId]);
-
-  const [similarCandidates, setSimilarCandidates] = useState<SimilarMatch[]>([]);
-  const [similarLoading, setSimilarLoading] = useState(false);
-
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmText, setConfirmText] = useState<string>("");
-  const [pendingGo, setPendingGo] = useState<null | (() => void)>(null);
-
-  const openConfirm = (text: string, onYes: () => void) => {
-    setConfirmText(text);
-    setPendingGo(() => onYes);
-    setConfirmOpen(true);
-  };
-
-  const closeConfirm = () => {
-    setConfirmOpen(false);
-    setConfirmText("");
-    setPendingGo(null);
-  };
-
-  useEffect(() => {
-    if (!confirmOpen) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeConfirm();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [confirmOpen]);
-
-  const [meId, setMeId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +96,31 @@ export default function MapView({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!confirmOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeConfirm();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [confirmOpen]);
+
+  const openConfirm = (text: string, onYes: () => void) => {
+    setConfirmText(text);
+    setPendingGo(() => onYes);
+    setConfirmOpen(true);
+  };
+
+  const closeConfirm = () => {
+    setConfirmOpen(false);
+    setConfirmText("");
+    setPendingGo(null);
+  };
 
   const ensureMeId = async (): Promise<number | null> => {
     if (meId != null) return meId;
@@ -122,9 +140,14 @@ export default function MapView({
 
   const markerStyle = useMemo(() => {
     if (!selectedItem) return undefined;
+
     const coords = MAIN_MAP_COORDS[selectedItem.roomId];
     if (!coords) return undefined;
-    return { left: `${coords.x}%`, top: `${coords.y}%` } as const;
+
+    return {
+      left: `${coords.x}%`,
+      top: `${coords.y}%`,
+    } as const;
   }, [selectedItem]);
 
   const drawerImg = resolveMediaUrl(selectedItem?.image_url);
@@ -137,10 +160,10 @@ export default function MapView({
   }, [selectedItem, meId]);
 
   const statusChipClass = useMemo(() => {
-    const s = selectedItem?.status ?? "OPEN";
-    if (s === "OPEN") return styles.statusOpen;
-    if (s === "IN_PROGRESS") return styles.statusInProgress;
-    if (s === "CLOSED") return styles.statusClosed;
+    const status = selectedItem?.status ?? "OPEN";
+    if (status === "OPEN") return styles.statusOpen;
+    if (status === "IN_PROGRESS") return styles.statusInProgress;
+    if (status === "CLOSED") return styles.statusClosed;
     return styles.statusOpen;
   }, [selectedItem?.status]);
 
@@ -183,27 +206,27 @@ export default function MapView({
     const targetType: ItemType = selectedItem.type === "lost" ? "found" : "lost";
 
     const base = [...similarCandidates]
-      .filter((m) => m.item?.id !== selectedItem.id)
-      .filter((m) => m.item?.type === targetType)
-      .filter((m) => m.item?.status !== "CLOSED")
+      .filter((match) => match.item?.id !== selectedItem.id)
+      .filter((match) => match.item?.type === targetType)
+      .filter((match) => match.item?.status !== "CLOSED")
       .sort((a, b) => b.similarity - a.similarity);
 
-    const strong = base.filter((m) => m.similarity >= SIMILARITY_THRESHOLD);
+    const strong = base.filter((match) => match.similarity >= SIMILARITY_THRESHOLD);
 
     return (strong.length ? strong : base).slice(0, 4);
   }, [similarCandidates, selectedItem]);
 
-  const askChatForSimilar = async (m: SimilarMatch) => {
+  const askChatForSimilar = async (match: SimilarMatch) => {
     const id = await ensureMeId();
     if (id == null) return;
-    if (m.item.owner_id === id) return;
+    if (match.item.owner_id === id) return;
 
     openConfirm("Уверены, что хотите перейти в чат?", () => {
-      navigate(`/chat?itemId=${m.item.id}&ownerId=${m.item.owner_id}`, {
+      navigate(`/chat?itemId=${match.item.id}&ownerId=${match.item.owner_id}`, {
         state: {
-          itemId: m.item.id,
-          ownerId: m.item.owner_id,
-          similarity: m.similarity,
+          itemId: match.item.id,
+          ownerId: match.item.owner_id,
+          similarity: match.similarity,
         },
       });
     });
@@ -245,240 +268,268 @@ export default function MapView({
 
   const canonicalUrl = `${window.location.origin}/`;
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    itemListElement: items.map((item, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      url: `${window.location.origin}/items/${item.id}`,
-      name: item.title,
-    })),
-  };
+  const visibleItemsForJsonLd = useMemo(
+    () => items.filter((item) => item.status !== "CLOSED"),
+    [items]
+  );
+
+  const jsonLd = useMemo(
+    () => ({
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      itemListElement: visibleItemsForJsonLd.map((item, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        url: `${window.location.origin}/items/${item.id}`,
+        name: item.title,
+      })),
+    }),
+    [visibleItemsForJsonLd]
+  );
 
   return (
     <>
       <Seo
-        title="Campus Lost&Found - карта и список находок"
-        description="Сервис поиска потерянных и найденных вещей на кампусе МТУСИ"
+        title="Campus Lost&Found — карта и список находок"
+        description="Сервис поиска потерянных и найденных вещей на кампусе МТУСИ."
         canonicalUrl={canonicalUrl}
         robots="index,follow"
         jsonLd={jsonLd}
       />
 
-      <div className={styles.root} data-testid="map-root">
-        <div className={styles.mapContainer}>
-          <div className={styles.mapFrameWrapper}>
-            <iframe
-              title="Карта МТУСИ, 1 этаж"
-              src="https://mtuci-map.vercel.app/"
-              className={styles.mapFrame}
-              loading="lazy"
-            />
-          </div>
+      <main className={styles.page} data-testid="map-root">
+        <section className={styles.hero} aria-labelledby="map-page-title">
+          <h1 id="map-page-title" className={styles.pageTitle}>
+            Campus Lost&amp;Found — сервис поиска потерянных и найденных вещей
+          </h1>
+          <p className={styles.pageLead}>
+            Находите объявления о потерянных и найденных вещах на кампусе,
+            фильтруйте по категории и локации, связывайтесь с владельцами.
+          </p>
+        </section>
 
-          <div className={styles.cityBadge}>📍 Кампус МТУСИ • 1 этаж</div>
+        <section className={styles.weatherSection} aria-label="Погода на кампусе">
+          <WeatherWidget />
+        </section>
 
-          {selectedItem && markerStyle && (
-            <div
-              className={`${styles.marker} ${
-                selectedItem.type === "lost" ? styles.markerLost : styles.markerFound
-              }`}
-              style={markerStyle}
-            />
-          )}
-
-          {drawerOpen && selectedItem && (
-            <div className={styles.drawer}>
-              <div className={styles.drawerHeader}>
-                <div className={styles.drawerTitle}>{selectedItem.title}</div>
-                <button onClick={() => setDrawerOpen(false)} className={styles.closeBtn}>
-                  ×
-                </button>
+        <section aria-label="Карта и список объявлений">
+          <div className={styles.root}>
+            <section className={styles.mapContainer} aria-label="Карта объявлений">
+              <div className={styles.mapFrameWrapper}>
+                <iframe
+                  title="Карта МТУСИ, 1 этаж"
+                  src="https://mtuci-map.vercel.app/"
+                  className={styles.mapFrame}
+                  loading="lazy"
+                />
               </div>
 
-              <div
-                className={styles.drawerImage}
-                role={canChatSelected ? "button" : undefined}
-                tabIndex={canChatSelected ? 0 : -1}
-                onClick={canChatSelected ? () => askChatForItem(selectedItem) : undefined}
-                onKeyDown={
-                  canChatSelected
-                    ? (e) => {
-                        if (e.key === "Enter") askChatForItem(selectedItem);
-                      }
-                    : undefined
-                }
-                style={{
-                  ...(drawerImg
-                    ? {
-                        backgroundImage: `url(${drawerImg})`,
-                        backgroundSize: "contain",
-                        backgroundRepeat: "no-repeat",
-                        backgroundPosition: "center",
-                      }
-                    : {}),
-                  cursor: canChatSelected ? "pointer" : "default",
-                }}
-                aria-label={
-                  canChatSelected ? "Перейти в чат с владельцем" : "Ваше объявление"
-                }
-              />
+              <div className={styles.cityBadge}>📍 Кампус МТУСИ • 1 этаж</div>
 
-              <div className={styles.chipsRow}>
-                <span className={`${styles.chip} ${typeChipClass}`}>
-                  {selectedItem.type === "lost" ? "Потеря" : "Нашёл"}
-                </span>
+              {selectedItem && markerStyle && (
+                <div
+                  className={`${styles.marker} ${
+                    selectedItem.type === "lost" ? styles.markerLost : styles.markerFound
+                  }`}
+                  style={markerStyle}
+                  aria-hidden="true"
+                />
+              )}
 
-                <span className={`${styles.chip} ${statusChipClass}`}>
-                  {selectedItem.status}
-                </span>
-
-                <span className={`${styles.chip} ${styles.chipPlace}`}>
-                  {selectedItem.roomLabel}, {selectedItem.floorLabel}
-                </span>
-              </div>
-
-              <p className={styles.desc}>{selectedItem.description}</p>
-
-              <div className={styles.similarBlock}>
-                <div className={styles.similarTitle}>Похожие (ИИ)</div>
-
-                {similarLoading ? (
-                  <div className={styles.similarGrid}>
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className={styles.similarSkeleton} />
-                    ))}
+              {drawerOpen && selectedItem && (
+                <aside
+                  className={styles.drawer}
+                  aria-label={`Карточка объявления: ${selectedItem.title}`}
+                >
+                  <div className={styles.drawerHeader}>
+                    <h2 className={styles.drawerTitle}>{selectedItem.title}</h2>
+                    <button
+                      type="button"
+                      onClick={() => setDrawerOpen(false)}
+                      className={styles.closeBtn}
+                      aria-label="Закрыть карточку"
+                    >
+                      ×
+                    </button>
                   </div>
-                ) : top4Similar.length === 0 ? (
-                  <div className={styles.similarEmpty}>Похожих объявлений пока нет</div>
-                ) : (
-                  <div className={styles.similarGrid}>
-                    {top4Similar.map((m) => {
-                      const img = resolveMediaUrl(m.item.image_url);
-                      const canOpen = m.item.status === "OPEN";
 
-                      return (
-                        <button
-                          key={m.item.id}
-                          type="button"
-                          className={styles.similarCardBtn}
-                          onClick={canOpen ? () => askChatForSimilar(m) : undefined}
-                          disabled={!canOpen}
-                          title={!canOpen ? "Чат доступен только для OPEN" : undefined}
-                        >
-                          <div
-                            className={styles.similarImage}
-                            style={
-                              img
-                                ? {
-                                    backgroundImage: `url(${img})`,
-                                    backgroundSize: "contain",
-                                    backgroundRepeat: "no-repeat",
-                                    backgroundPosition: "center",
-                                  }
-                                : undefined
+                  <div
+                    className={styles.drawerImage}
+                    role={canChatSelected ? "button" : undefined}
+                    tabIndex={canChatSelected ? 0 : -1}
+                    onClick={canChatSelected ? () => askChatForItem(selectedItem) : undefined}
+                    onKeyDown={
+                      canChatSelected
+                        ? (event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              askChatForItem(selectedItem);
                             }
-                          />
-                        </button>
-                      );
-                    })}
+                          }
+                        : undefined
+                    }
+                    style={
+                      drawerImg
+                        ? {
+                            backgroundImage: `url(${drawerImg})`,
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                            cursor: canChatSelected ? "pointer" : "default",
+                          }
+                        : {
+                            cursor: canChatSelected ? "pointer" : "default",
+                          }
+                    }
+                    aria-label={
+                      canChatSelected
+                        ? "Перейти в чат с владельцем объявления"
+                        : "Изображение объявления"
+                    }
+                  >
+                    {!drawerImg && (
+                      <div className={styles.drawerImagePlaceholder}>Изображение отсутствует</div>
+                    )}
                   </div>
-                )}
+
+                  <div className={styles.chipsRow}>
+                    <span className={`${styles.chip} ${typeChipClass}`}>
+                      {selectedItem.type === "lost" ? "Потеря" : "Находка"}
+                    </span>
+
+                    <span className={`${styles.chip} ${statusChipClass}`}>
+                      {getReadableStatus(selectedItem.status)}
+                    </span>
+
+                    <span className={`${styles.chip} ${styles.chipPlace}`}>
+                      {selectedItem.roomLabel}, {selectedItem.floorLabel}
+                    </span>
+                  </div>
+
+                  <p className={styles.desc}>{selectedItem.description}</p>
+
+                  <section className={styles.similarBlock} aria-labelledby="similar-items-title">
+                    <h3 id="similar-items-title" className={styles.similarTitle}>
+                      Похожие объявления (ИИ)
+                    </h3>
+
+                    {similarLoading ? (
+                      <div className={styles.similarGrid}>
+                        {[1, 2, 3, 4].map((i) => (
+                          <div key={i} className={styles.similarSkeleton} />
+                        ))}
+                      </div>
+                    ) : top4Similar.length === 0 ? (
+                      <div className={styles.similarEmpty}>Похожих объявлений пока нет</div>
+                    ) : (
+                      <div className={styles.similarGrid}>
+                        {top4Similar.map((match) => {
+                          const img = resolveMediaUrl(match.item.image_url);
+                          const canOpen = match.item.status === "OPEN";
+
+                          return (
+                            <button
+                              key={match.item.id}
+                              type="button"
+                              className={styles.similarCardBtn}
+                              onClick={canOpen ? () => askChatForSimilar(match) : undefined}
+                              disabled={!canOpen}
+                              title={!canOpen ? "Чат доступен только для открытых объявлений" : ""}
+                              aria-label={`Открыть похожее объявление: ${match.item.title}`}
+                            >
+                              <div
+                                className={styles.similarImage}
+                                style={
+                                  img
+                                    ? {
+                                        backgroundImage: `url(${img})`,
+                                        backgroundSize: "contain",
+                                        backgroundRepeat: "no-repeat",
+                                        backgroundPosition: "center",
+                                      }
+                                    : undefined
+                                }
+                              >
+                                {!img && (
+                                  <div className={styles.similarImagePlaceholder}>
+                                    Нет фото
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
+                </aside>
+              )}
+            </section>
+
+            <section className={styles.aside} aria-label="Фильтры и список объявлений">
+              <Filters />
+
+              <div className={styles.resultsInfo}>
+                Показано: {items.length}
+                {typeof itemsTotal === "number" ? ` из ${totalItems}` : ""}
               </div>
-            </div>
-          )}
-        </div>
 
-        <aside className={styles.aside}>
-          <Filters />
+              <div className={styles.items}>
+                {items.map((item) => (
+                  <ItemCard
+                    key={item.id}
+                    title={item.title}
+                    place={`${item.roomLabel}, ${item.floorLabel}`}
+                    timeAgo={item.timeAgo}
+                    status={item.status}
+                    imageUrl={item.image_url}
+                    onClick={() => setSelectedId(item.id)}
+                    onDoubleClick={() => {
+                      setSelectedId(item.id);
+                      setDrawerOpen(true);
+                    }}
+                  />
+                ))}
+              </div>
 
-          <div
-            style={{
-              marginTop: 10,
-              marginBottom: 10,
-              fontSize: 14,
-              opacity: 0.8,
-            }}
-          >
-            Показано: {items.length}
-            {typeof itemsTotal === "number" ? ` из ${itemsTotal}` : ""}
+              <nav className={styles.pagination} aria-label="Навигация по страницам">
+                <button
+                  type="button"
+                  onClick={() => updatePage(currentPage - 1)}
+                  disabled={!canGoPrev}
+                  className={styles.pageBtn}
+                >
+                  Назад
+                </button>
+
+                <div className={styles.pageIndicator}>Страница {currentPage}</div>
+
+                <button
+                  type="button"
+                  onClick={() => updatePage(currentPage + 1)}
+                  disabled={!canGoNext}
+                  className={styles.pageBtn}
+                >
+                  Далее
+                </button>
+              </nav>
+            </section>
           </div>
-
-          <div className={styles.items}>
-            {items.map((item) => (
-              <ItemCard
-                key={item.id}
-                title={item.title}
-                place={`${item.roomLabel}, ${item.floorLabel}`}
-                timeAgo={item.timeAgo}
-                status={item.status}
-                imageUrl={item.image_url}
-                onClick={() => setSelectedId(item.id)}
-                onDoubleClick={() => {
-                  setSelectedId(item.id);
-                  setDrawerOpen(true);
-                }}
-              />
-            ))}
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 10,
-              marginTop: 12,
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => updatePage(currentPage - 1)}
-              disabled={!canGoPrev}
-              style={{
-                padding: "10px 14px",
-                borderRadius: 10,
-                border: "1px solid rgba(0,0,0,0.12)",
-                background: "white",
-                cursor: canGoPrev ? "pointer" : "default",
-                opacity: canGoPrev ? 1 : 0.5,
-              }}
-            >
-              Назад
-            </button>
-
-            <div style={{ fontSize: 14 }}>
-              Страница {currentPage}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => updatePage(currentPage + 1)}
-              disabled={!canGoNext}
-              style={{
-                padding: "10px 14px",
-                borderRadius: 10,
-                border: "1px solid rgba(0,0,0,0.12)",
-                background: "white",
-                cursor: canGoNext ? "pointer" : "default",
-                opacity: canGoNext ? 1 : 0.5,
-              }}
-            >
-              Далее
-            </button>
-          </div>
-        </aside>
+        </section>
 
         {confirmOpen && (
           <div
             className={styles.modalOverlay}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="confirm-dialog-title"
             onClick={closeConfirm}
           >
-            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-              <div className={styles.modalTitle}>Подтверждение</div>
+            <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
+              <h2 id="confirm-dialog-title" className={styles.modalTitle}>
+                Подтверждение
+              </h2>
+
               <div className={styles.modalText}>{confirmText}</div>
 
               <div className={styles.modalActions}>
@@ -505,7 +556,7 @@ export default function MapView({
             </div>
           </div>
         )}
-      </div>
+      </main>
     </>
   );
 }

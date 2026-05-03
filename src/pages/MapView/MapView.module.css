@@ -1,9 +1,29 @@
+.page {
+  @apply px-4 py-4 md:px-6 md:py-6;
+}
+
+.hero {
+  @apply mb-4;
+}
+
+.pageTitle {
+  @apply text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100;
+}
+
+.pageLead {
+  @apply mt-2 text-sm md:text-base text-slate-600 dark:text-slate-300 max-w-3xl;
+}
+
+.weatherSection {
+  @apply mb-4;
+}
+
 .root {
-  @apply h-[calc(100vh-4rem)] grid grid-cols-[1fr_420px];
+  @apply grid grid-cols-1 lg:grid-cols-[1fr_420px] min-h-[calc(100vh-12rem)] rounded-2xl overflow-hidden;
 }
 
 .mapContainer {
-  @apply relative;
+  @apply relative min-h-[420px] bg-slate-100 dark:bg-slate-950;
 }
 
 .mapFrameWrapper {
@@ -11,15 +31,15 @@
 }
 
 .mapFrame {
-  @apply w-full h-full border-0 pointer-events-none;
+  @apply w-full h-full border-0;
 }
 
 .cityBadge {
-  @apply absolute top-4 left-4 z-10 px-3 py-1 rounded-full bg-white/90 backdrop-blur border text-sm;
+  @apply absolute top-4 left-4 z-10 px-3 py-1 rounded-full bg-white/90 dark:bg-slate-900/90 backdrop-blur border border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-slate-100 shadow-sm;
 }
 
 .marker {
-  @apply absolute w-3 h-3 rounded-full shadow -translate-x-1/2 -translate-y-1/2;
+  @apply absolute z-10 w-3 h-3 rounded-full shadow-lg -translate-x-1/2 -translate-y-1/2 ring-2 ring-white dark:ring-slate-900;
 }
 
 .markerLost {
@@ -30,98 +50,80 @@
   @apply bg-blue-600;
 }
 
-.openDrawerBtn {
-  @apply absolute bottom-6 left-6 px-4 py-2 rounded-xl bg-slate-900 text-white shadow;
-}
-
 .drawer {
-  @apply absolute right-0 top-0 h-full w-[460px] bg-white dark:bg-slate-900 border-l dark:border-slate-700 shadow-xl p-4 overflow-y-auto;
+  @apply absolute right-0 top-0 z-20 h-full w-full max-w-[460px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-xl p-4 overflow-y-auto;
 }
 
 .drawerHeader {
-  @apply flex items-start justify-between mb-3;
+  @apply flex items-start justify-between gap-3 mb-3;
 }
 
 .drawerTitle {
-  @apply text-lg font-semibold;
+  @apply m-0 text-lg font-semibold text-slate-900 dark:text-slate-100;
 }
 
 .closeBtn {
-  @apply px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800;
+  @apply shrink-0 px-2 py-1 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors;
 }
 
 .drawerImage {
-  @apply aspect-video w-full rounded-xl bg-slate-100 dark:bg-slate-800 mb-3;
+  @apply aspect-video w-full rounded-xl bg-slate-100 dark:bg-slate-800 mb-3 border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center;
+}
+
+.drawerImagePlaceholder {
+  @apply text-sm text-slate-500 dark:text-slate-400;
 }
 
 .chipsRow {
-  @apply flex items-center gap-2 mb-2;
+  @apply flex flex-wrap items-center gap-2 mb-3;
 }
 
-.chipLoss {
-  @apply px-2 py-1 rounded-full text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200;
+.chip {
+  @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold leading-none;
 }
 
-.chipOpen {
-  @apply px-2 py-1 rounded-full text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200;
+.typeLost {
+  @apply bg-blue-600 text-white;
+}
+
+.typeFound {
+  @apply bg-violet-600 text-white;
+}
+
+.statusOpen {
+  @apply bg-emerald-500 text-white;
+}
+
+.statusInProgress {
+  @apply bg-amber-500 text-slate-950;
+}
+
+.statusClosed {
+  @apply bg-red-500 text-white;
 }
 
 .chipPlace {
-  @apply px-2 py-1 rounded-full text-xs bg-slate-100 dark:bg-slate-800;
+  @apply bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200;
 }
 
 .desc {
-  @apply text-sm text-slate-600 dark:text-slate-300 mb-3;
+  @apply text-sm leading-6 text-slate-600 dark:text-slate-300 mb-4;
 }
 
 .similarBlock {
-  @apply mb-4;
+  @apply mb-2;
 }
 
 .similarTitle {
-  @apply font-medium mb-2;
+  @apply m-0 mb-2 text-base font-medium text-slate-900 dark:text-slate-100;
 }
 
 .similarGrid {
   @apply grid grid-cols-2 gap-2;
 }
 
-.similarCard {
-  @apply rounded-lg border dark:border-slate-700 overflow-hidden;
-}
-
-.similarImage {
-  @apply aspect-[4/3] bg-slate-100 dark:bg-slate-800;
-}
-
-.similarCaption {
-  @apply px-2 py-1 text-xs;
-}
-
-.actions {
-  @apply flex gap-2;
-}
-
-.chatBtn {
-  @apply px-3 py-2 rounded-xl bg-slate-900 text-white;
-}
-
-.reportBtn {
-  @apply px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800;
-}
-
-.aside {
-  @apply border-l dark:border-slate-700 bg-white dark:bg-slate-900 p-4 overflow-y-auto;
-}
-
-.items {
-  @apply mt-3 space-y-3;
-}
-
-.similarCardBtn > .similarImage {
-  width: 100%;
-  height: 100%;
-  display: block;
+.similarCardBtn {
+  @apply rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900 transition hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed;
 }
 
 .similarCardBtn:focus-visible {
@@ -129,25 +131,56 @@
   outline-offset: 2px;
 }
 
+.similarImage {
+  @apply aspect-[4/3] bg-slate-100 dark:bg-slate-800 flex items-center justify-center;
+}
+
+.similarImagePlaceholder {
+  @apply text-xs text-slate-500 dark:text-slate-400;
+}
+
 .similarSkeleton {
-  @apply aspect-[4/3] rounded-lg bg-slate-100 dark:bg-slate-800 border dark:border-slate-700;
+  @apply aspect-[4/3] rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 animate-pulse;
 }
 
 .similarEmpty {
   @apply text-sm text-slate-500 dark:text-slate-400;
 }
 
-/* Modal */
+.aside {
+  @apply border-l-0 lg:border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 overflow-y-auto;
+}
+
+.resultsInfo {
+  @apply mt-3 mb-3 text-sm text-slate-600 dark:text-slate-300;
+}
+
+.items {
+  @apply mt-3 space-y-3;
+}
+
+.pagination {
+  @apply flex items-center justify-between gap-3 mt-4;
+}
+
+.pageBtn {
+  @apply px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 transition disabled:opacity-50 disabled:cursor-default;
+}
+
+.pageIndicator {
+  @apply text-sm text-slate-700 dark:text-slate-200;
+}
+
 .modalOverlay {
   @apply fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4;
 }
 
 .modal {
-  @apply w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border dark:border-slate-700 shadow-xl p-4;
+  @apply w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl p-4;
 }
 
 .modalTitle {
-  @apply text-lg font-semibold mb-2;
+  @apply text-lg font-semibold mb-2 text-slate-900 dark:text-slate-100;
 }
 
 .modalText {
@@ -159,89 +192,9 @@
 }
 
 .modalSecondary {
-  @apply px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800;
+  @apply px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100;
 }
 
 .modalPrimary {
-  @apply px-3 py-2 rounded-xl bg-slate-900 text-white;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-}
-
-/* Тип */
-.typeLost {
-  background: #2f6fed; /* синий */
-  color: #fff;
-}
-
-.typeFound {
-  background: #7c3aed; /* фиолетовый */
-  color: #fff;
-}
-
-/* Статус */
-.statusOpen {
-  background: #22c55e; /* зелёный */
-  color: #fff;
-}
-
-.statusInProgress {
-  background: #f59e0b; /* жёлтый */
-  color: #111;
-}
-
-.statusClosed {
-  background: #ef4444; /* красный */
-  color: #fff;
-}
-
-.drawerImageTag {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.drawerImagePlaceholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  opacity: 0.6;
-}
-
-.similarImageTag {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.similarImagePlaceholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  opacity: 0.6;
-}
-
-.drawerTitle {
-  margin: 0;
-}
-
-.similarTitle {
-  margin: 0;
+  @apply px-3 py-2 rounded-xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900;
 }

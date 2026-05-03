@@ -30,6 +30,7 @@ const ProfileView = lazy(() => import("./pages/ProfileView"));
 const AccountSettingsView = lazy(() => import("./pages/Account/AccountSettingsView"));
 const ChangePasswordView = lazy(() => import("./pages/Account/ChangePasswordView"));
 const TestRunner = lazy(() => import("./tests/TestRunner"));
+const NotFoundView = lazy(() => import("./pages/NotFoundView/NotFoundView"));
 
 function isItemType(value: string | null): value is ItemType {
   return value === "lost" || value === "found";
@@ -195,7 +196,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const isItemsRoute = location.pathname === "/" || location.pathname === "/moderation";
+    const isItemsRoute = location.pathname === "/";
 
     if (!isItemsRoute) {
       return;
@@ -230,9 +231,6 @@ export default function App() {
         break;
       case "/chat":
         setView("chat");
-        break;
-      case "/moderation":
-        setView("moderation");
         break;
       case "/admin":
         setView("admin");
@@ -274,7 +272,7 @@ export default function App() {
         navigate("/chat");
         break;
       case "moderation":
-        navigate("/moderation");
+        navigate("/");
         break;
       case "admin":
         navigate("/admin");
@@ -341,11 +339,14 @@ export default function App() {
                 drawerOpen={drawerOpen}
                 setDrawerOpen={setDrawerOpen}
                 items={items}
+                itemsTotal={itemsTotal}
+                itemsPage={itemsPage}
+                itemsPageSize={itemsPageSize}
               />
             }
           />
 
-          <Route path="/items/:id" element={<ItemDetailView />} />
+          <Route path="/items/:id/:slug?" element={<ItemDetailView />} />
 
           <Route element={<RequireNotBanned />}>
             <Route path="/create" element={<CreateView onItemCreated={addItem} />} />
@@ -356,16 +357,7 @@ export default function App() {
             <Route path="/admin" element={<AdminView />} />
           </Route>
 
-          <Route
-            path="/moderation"
-            element={
-              <MapView
-                drawerOpen={drawerOpen}
-                setDrawerOpen={setDrawerOpen}
-                items={items}
-              />
-            }
-          />
+          <Route path="/moderation" element={<Navigate to="/" replace />} />
 
           <Route
             path="/login"
@@ -416,6 +408,8 @@ export default function App() {
               element={<ChangePasswordView onBack={() => handleSetView("account")} />}
             />
           </Route>
+
+          <Route path="*" element={<NotFoundView />} />
         </Routes>
 
         {showTests && <TestRunner setView={handleSetView} />}
