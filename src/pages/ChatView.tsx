@@ -194,12 +194,15 @@ export default function ChatView() {
       socketRef.current = null;
     }
 
-    const s = io("http://127.0.0.1:8000", {
-      path: "/socket.io",
-      transports: ["websocket"],
-      withCredentials: true,
-      auth: { token },
-    });
+    const socketUrl =
+  import.meta.env.VITE_SOCKET_URL ?? window.location.origin;
+
+const s = io(socketUrl, {
+  path: "/socket.io",
+  transports: ["websocket"],
+  withCredentials: true,
+  auth: { token },
+});
 
     socketRef.current = s;
 
