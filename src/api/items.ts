@@ -1,8 +1,5 @@
-import axios from "axios";
 import { RoomId } from "../data/roomCoords";
 import { api } from "./client";
-
-const API_URL = import.meta.env.VITE_API_URL;
 
 export type ItemType = "lost" | "found";
 export type StatusType = "OPEN" | "IN_PROGRESS" | "CLOSED";
@@ -67,20 +64,16 @@ export async function uploadItemImage(
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await axios.post<MapItem>(
-    `${API_URL}/items/${itemId}/image`,
-    formData,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      onUploadProgress: (event) => {
-        if (!event.total) return;
-        const percent = Math.round((event.loaded * 100) / event.total);
-        onProgress?.(percent);
-      },
-    }
-  );
+  const response = await api.post<MapItem>(`/items/${itemId}/image`, formData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    onUploadProgress: (event) => {
+      if (!event.total) return;
+      const percent = Math.round((event.loaded * 100) / event.total);
+      onProgress?.(percent);
+    },
+  });
 
   return response.data;
 }

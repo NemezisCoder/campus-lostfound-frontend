@@ -1,3 +1,5 @@
+import { api } from "./client";
+
 export type CampusWeather = {
   provider: string;
   location: {
@@ -15,11 +17,6 @@ export type CampusWeather = {
 };
 
 export async function fetchCampusWeather(signal?: AbortSignal): Promise<CampusWeather> {
-  const response = await fetch("/api/v1/weather/campus", { signal });
-
-  if (!response.ok) {
-    throw new Error(`Weather request failed: ${response.status}`);
-  }
-
-  return response.json();
+  const response = await api.get<CampusWeather>("/weather/campus", { signal });
+  return response.data;
 }

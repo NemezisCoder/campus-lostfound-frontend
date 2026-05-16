@@ -20,3 +20,7 @@ playwright-report/
 .nyc_output/
 .vitest/
 
+
+# Local env overrides that may contain deployment-specific values
+.env.local
+.env.*.local

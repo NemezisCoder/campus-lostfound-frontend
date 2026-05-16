@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { io, type Socket } from "socket.io-client";
+import { SOCKET_URL } from "../api/config";
 import Seo from "../components/Seo";
 import styles from "./ChatView.module.css";
 import { api } from "../api/client";
@@ -194,15 +195,12 @@ export default function ChatView() {
       socketRef.current = null;
     }
 
-    const socketUrl =
-  import.meta.env.VITE_SOCKET_URL ?? window.location.origin;
-
-const s = io(socketUrl, {
-  path: "/socket.io",
-  transports: ["websocket"],
-  withCredentials: true,
-  auth: { token },
-});
+    const s = io(SOCKET_URL, {
+      path: "/socket.io",
+      transports: ["websocket"],
+      withCredentials: true,
+      auth: { token },
+    });
 
     socketRef.current = s;
 
