@@ -17,6 +17,7 @@ import type {
 import { fetchItemsPage } from "./api/items";
 
 import { clearTokens, getRefreshToken, setAccessToken, setRefreshToken } from "./api/client";
+import { API_BASE_URL } from "./api/config";
 import { fetchMe, logout as apiLogout, type MeResponse } from "./api/auth";
 import styles from "./App.module.css";
 
@@ -166,7 +167,7 @@ export default function App() {
       }
 
       try {
-        const r = await fetch("/api/v1/auth/refresh", {
+        const r = await fetch(`${API_BASE_URL}/auth/refresh`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

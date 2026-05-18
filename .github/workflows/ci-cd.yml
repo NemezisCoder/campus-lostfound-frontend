@@ -1,0 +1,190 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  NODE_VERSION: "20"
+  REGISTRY: ghcr.io
+  LOCAL_IMAGE: campus-lostfound-frontend:${{ github.sha }}
+
+jobs:
+  quality:
+    name: Test, lint, and build app
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint/type checks
+        run: npm run lint
+
+      - name: Run unit and integration tests
+        run: npm run test:run
+
+      - name: Build production assets
+        run: npm run build
+
+      - name: Upload built frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+          if-no-files-found: error
+
+  image:
+    name: Build, smoke-test, and publish image
+    runs-on: ubuntu-latest
+    needs: quality
+
+    outputs:
+      image-ref: ${{ steps.image-name.outputs.image-ref }}
+      image-sha-tag: ${{ steps.image-name.outputs.image-sha-tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compute lowercase image name
+        id: image-name
+        run: |
+          IMAGE_REPOSITORY="${GITHUB_REPOSITORY,,}"
+          IMAGE_REF="${REGISTRY}/${IMAGE_REPOSITORY}"
+          echo "image-ref=${IMAGE_REF}" >> "$GITHUB_OUTPUT"
+          echo "image-sha-tag=${IMAGE_REF}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build image for every change
+        run: docker build --tag "${LOCAL_IMAGE}" .
+
+      - name: Smoke-test container health endpoint
+        run: |
+          docker run --detach --rm --name frontend-smoke --publish 8080:80 "${LOCAL_IMAGE}"
+          trap 'docker stop frontend-smoke' EXIT
+          for attempt in {1..20}; do
+            if curl -fsS http://localhost:8080/healthz; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs frontend-smoke
+          exit 1
+
+      - name: Set up Docker Buildx
+        if: github.event_name != 'pull_request'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        if: github.event_name != 'pull_request'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image-name.outputs.image-ref }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Publish image after successful checks
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy target environment
+    runs-on: ubuntu-latest
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${{ secrets.DEPLOY_PORT || '22' }}" "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy frontend image with Docker Compose
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME || github.actor }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          FRONTEND_IMAGE: ${{ needs.image.outputs.image-ref }}
+          FRONTEND_TAG: sha-${{ github.sha }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN='$GHCR_TOKEN' FRONTEND_IMAGE='$FRONTEND_IMAGE' FRONTEND_TAG='$FRONTEND_TAG' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+
+          if [ -n "${GHCR_TOKEN:-}" ]; then
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+          fi
+
+          touch .env
+          if grep -q '^FRONTEND_IMAGE=' .env; then
+            sed -i "s|^FRONTEND_IMAGE=.*|FRONTEND_IMAGE=${FRONTEND_IMAGE}|" .env
+          else
+            printf '\nFRONTEND_IMAGE=%s\n' "$FRONTEND_IMAGE" >> .env
+          fi
+
+          if grep -q '^FRONTEND_TAG=' .env; then
+            sed -i "s|^FRONTEND_TAG=.*|FRONTEND_TAG=${FRONTEND_TAG}|" .env
+          else
+            printf 'FRONTEND_TAG=%s\n' "$FRONTEND_TAG" >> .env
+          fi
+
+          docker compose pull frontend
+          docker compose up -d frontend reverse-proxy
+          docker compose ps
+          REMOTE
+
+      - name: Verify deployed health endpoint
+        env:
+          DEPLOY_HEALTH_URL: ${{ secrets.DEPLOY_HEALTH_URL }}
+        run: |
+          if [ -z "$DEPLOY_HEALTH_URL" ]; then
+            echo "DEPLOY_HEALTH_URL is not set; skipping external deployment smoke check."
+            exit 0
+          fi
+          curl -fsS --retry 10 --retry-delay 5 --retry-connrefused "$DEPLOY_HEALTH_URL"
