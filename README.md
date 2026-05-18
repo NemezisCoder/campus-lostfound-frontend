@@ -38,6 +38,11 @@ curl http://localhost:8080/healthz
 ## Quality checks
 
 ```bash
+npm run lint
 npm run test:run
 npm run build
 ```
+
+## CI/CD
+
+GitHub Actions automation is defined in `.github/workflows/ci-cd.yml`. It runs lint/type checks, tests, production builds, Docker image builds, container smoke checks, GHCR publication, and SSH-based deployment after successful checks on `main`. See `docs/ci-cd.md` for the required GitHub secrets and the server-side Docker Compose contract.
